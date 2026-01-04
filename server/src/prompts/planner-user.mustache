@@ -1,0 +1,58 @@
+Scenario Name: {{name}}
+Description: {{description}}
+Raw Input: {{rawInput}}
+
+PLANNING INSTRUCTIONS:
+- Analyze this scenario and identify any complex actions (login, form submission, modal interactions, etc.)
+- For each complex action, determine what prerequisites are needed
+- Add preparation steps BEFORE the main action to ensure UI elements are visible and accessible
+- Do NOT assume forms, modals, or interactive elements are already visible
+- Think about what buttons/links might need to be clicked to reveal hidden elements
+- Add verification steps where appropriate to confirm elements are ready before interaction
+
+ACTION ARGUMENTS - UNIFIED APPROACH:
+
+The system uses adaptive element discovery that automatically chooses the best strategy.
+For each interaction action (click, type, hover), provide BOTH:
+
+1. "selector" field: Best-guess CSS selector based on common patterns (e.g., "button.login", "#email-input")
+   - This will be tried first (fast, reliable)
+   - If it fails, system automatically falls back to adaptive discovery
+
+2. "description" field: Generic natural language description WITHOUT location assumptions
+   - Used as fallback when selector fails
+   - Used by adaptive discovery to find elements intelligently
+   - DO NOT include location context (e.g., "the login button" NOT "the login button in the top navigation")
+   - The execution layer will discover elements adaptively based on the actual page structure
+
+Examples:
+  * Click: { "selector": "button.login", "description": "the login button" }
+  * Type: { "selector": "input[type='email']", "description": "the email input field", "value": "user@example.com" }
+  * Hover: { "selector": ".menu-item", "description": "the menu item" }
+
+Example: For a login scenario, you should:
+1. Navigate to the page
+2. Click the login button/link (if form is not visible) - use generic description: "the login button" or "a login link"
+3. Wait for the form to appear
+4. Type into email field - use generic description: "the email input field"
+5. Type into password field - use generic description: "the password input field"
+6. Click submit button - use generic description: "the submit button" or "the login button"
+7. ONLY add verification steps if explicitly requested in the scenario. DO NOT assume what "login success" means - do not check for specific URLs, page titles, or elements unless the user explicitly asks for them.
+
+CRITICAL: Use generic descriptions without location assumptions. The execution layer will discover elements adaptively based on the actual page structure.
+
+CRITICAL: DO NOT MAKE ASSUMPTIONS ABOUT POST-ACTION STATES:
+- Do NOT assume URLs will change after login/submit actions unless explicitly stated
+- Do NOT assume specific page titles or elements will appear unless the user requests verification
+- Do NOT add verification steps that check for things the user didn't ask for
+- ONLY verify what the user explicitly requests in the scenario description
+
+MULTIPLE ELEMENT VERIFICATION:
+- When the scenario asks to verify multiple elements (e.g., "verify presence of 'X' and 'Y'"), SPLIT into separate steps
+- Each element should have its own verification step for clarity and better error reporting
+- Example: "Verify presence of 'Data Lake Objects' and 'Data Model' tabs" should become:
+  * Step N: "Verify presence of 'Data Lake Objects' tab" (verify_element_visible with description "Data Lake Objects tab")
+  * Step N+1: "Verify presence of 'Data Model' tab" (verify_element_visible with description "Data Model tab")
+
+Apply similar defensive planning to other complex actions in this scenario.
+

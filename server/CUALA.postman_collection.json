@@ -1,0 +1,654 @@
+{
+	"info": {
+		"_postman_id": "cuala-api-collection",
+		"name": "CUALA API",
+		"description": "Collection for testing CUALA test automation API endpoints. Uses unified executor that automatically chooses DOM or Vision for each step.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": ["{{baseUrl}}"],
+					"path": ["health"]
+				},
+				"description": "Check if the API server is running"
+			},
+			"response": []
+		},
+		{
+			"name": "Execute (Synchronous)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"scenario\": \"Navigate to https://example.com and verify that the heading says \\\"Example Domain\\\"\",\n  \"failFast\": true\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/execute",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "execute"]
+				},
+				"description": "Execute a test scenario synchronously (waits for completion). The unified executor automatically chooses DOM or Vision for each step. failFast (default: true) determines if execution stops on first error."
+			},
+			"response": []
+		},
+		{
+			"name": "Generate Plan (Dry Run)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Save planId and scenarioId to environment variables",
+							"if (pm.response.code === 200) {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.planId) {",
+							"        pm.environment.set('planId', jsonData.planId);",
+							"        console.log('Plan ID:', jsonData.planId);",
+							"    }",
+							"    if (jsonData.scenarioId) {",
+							"        pm.environment.set('scenarioId', jsonData.scenarioId);",
+							"        console.log('Scenario ID:', jsonData.scenarioId);",
+							"    }",
+							"    console.log('Success:', jsonData.success);",
+							"    console.log('Already Exists:', jsonData.alreadyExists);",
+							"    console.log('Total Steps:', jsonData.totalSteps);",
+							"    if (jsonData.alreadyExists) {",
+							"        console.log('Note: Plan already existed, returning existing plan');",
+							"    } else {",
+							"        console.log('Note: New plan was created');",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"scenario\": \"Navigate to https://example.com, wait 5 seconds, then verify the page title contains Example Domain, and verify the heading says Example Domain\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/plan",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "plan"]
+				},
+				"description": "Generate an execution plan without executing it (dry run). Useful for testing and debugging to see what plan would be generated. The unified executor will automatically choose DOM or Vision for each step during execution.\n\n**Response Fields:**\n- `success` (boolean): Always `true` for successful responses\n- `alreadyExists` (boolean): `true` if the plan already existed for this scenario, `false` if a new plan was created\n- `planId` (string): The plan identifier\n- `scenarioId` (string): The scenario identifier\n- `name` (string): Human-readable plan name\n- `steps` (array): Array of execution steps\n- `totalSteps` (number): Total number of steps\n- `message` (string): Descriptive message indicating whether plan was reused or newly created"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Scenario ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Save scenarioId to environment variable",
+							"if (pm.response.code === 200) {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.scenarioId) {",
+							"        pm.environment.set('scenarioId', jsonData.scenarioId);",
+							"        console.log('Scenario ID:', jsonData.scenarioId);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"scenario\": \"Navigate to https://example.com and verify that the heading says \\\"Example Domain\\\"\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/get-scenario-id",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "get-scenario-id"]
+				},
+				"description": "Get the scenarioId for a given scenario description. Useful for looking up execution history."
+			},
+			"response": []
+		},
+		{
+			"name": "Execute Async",
+			"item": [
+				{
+					"name": "Start Async Execution",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save testId and scenarioId to environment variables",
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    pm.environment.set('testId', jsonData.testId);",
+									"    pm.environment.set('scenarioId', jsonData.scenarioId);",
+									"    console.log('Test ID:', jsonData.testId);",
+									"    console.log('Scenario ID:', jsonData.scenarioId);",
+									"    console.log('Status:', jsonData.status);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com, wait 5 seconds, then navigate to https://www.wikipedia.org, wait 5 seconds, then navigate back to https://example.com, wait 5 seconds, verify the page title contains Example Domain, wait 5 seconds, verify the heading says Example Domain, wait 5 seconds, then navigate to https://www.google.com, wait 5 seconds, verify Google is in the page title, wait 5 seconds, navigate back to example.com, wait 5 seconds, and finally verify the page contains Example Domain text. Repeat this sequence 2 times with 2 second waits between each action.\",\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "execute-async"]
+						},
+						"description": "Start an async test execution. Returns immediately with testId and scenarioId. The unified executor automatically chooses DOM or Vision for each step. failFast (default: true) determines if execution stops on first error."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Status by Test ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/get-status/{{testId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "get-status", "{{testId}}"]
+						},
+						"description": "Get the current status of a specific test execution by testId. Returns progress, steps, and execution results."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Statuses",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/get-all-statuses",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "get-all-statuses"]
+						},
+						"description": "Get all test execution statuses. Returns a list of all tests with their status, progress, plan names, and execution details. Results are sorted by creation time (newest first)."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete All Executions",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/executions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "executions"]
+						},
+						"description": "Delete all execution statuses from storage. This permanently removes all execution records. Use with caution!"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Execution History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/get-history/{{scenarioId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "get-history", "{{scenarioId}}"]
+						},
+						"description": "Get all execution history for a scenario (all test runs with the same scenario description). Use scenarioId from execute or execute-async response."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Latest Execution",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/get-latest/{{scenarioId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "get-latest", "{{scenarioId}}"]
+						},
+						"description": "Get the most recent execution for a scenario. Use scenarioId from execute or execute-async response."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Plan by Plan ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save planId to environment variable if available",
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.planId) {",
+									"        pm.environment.set('planId', jsonData.planId);",
+									"        console.log('Plan ID:', jsonData.planId);",
+									"    }",
+									"    console.log('Total Steps:', jsonData.steps ? jsonData.steps.length : 0);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/get-plan/{{planId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "get-plan", "{{planId}}"]
+						},
+						"description": "Get the execution plan by planId. Use planId from execution status or latest execution response."
+					},
+					"response": []
+				},
+				{
+					"name": "List All Plans",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/list-plans",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "list-plans"]
+						},
+						"description": "List all execution plans. Returns a list of all plans with their details including plan ID, name, scenario ID, steps count, and creation time. Results are sorted by creation time (newest first)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Plan by Plan ID",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Plan Name\",\n  \"phase\": \"refined\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/plans/{{planId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plans", "{{planId}}"]
+						},
+						"description": "Update an existing plan by planId. You can update the plan name, phase, steps, or other properties. Note: plan ID and scenario ID cannot be changed."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Plan by Plan ID",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/plans/{{planId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plans", "{{planId}}"]
+						},
+						"description": "Delete an execution plan by planId. This permanently removes the plan from storage."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete All Plans",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/plans",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plans"]
+						},
+						"description": "Delete all execution plans from storage. This permanently removes all plans. Use with caution!"
+					},
+					"response": []
+				},
+				{
+					"name": "Execute Plan by Plan ID (Synchronous)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save testId and scenarioId to environment variables",
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.planId) {",
+									"        pm.environment.set('planId', jsonData.planId);",
+									"        console.log('Plan ID:', jsonData.planId);",
+									"    }",
+									"    if (jsonData.scenarioId) {",
+									"        pm.environment.set('scenarioId', jsonData.scenarioId);",
+									"        console.log('Scenario ID:', jsonData.scenarioId);",
+									"    }",
+									"    console.log('Status:', jsonData.status);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/plans/{{planId}}/execute",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plans", "{{planId}}", "execute"]
+						},
+						"description": "Execute a plan by plan ID synchronously (waits for completion). Returns full execution results. failFast (default: true) determines if execution stops on first error."
+					},
+					"response": []
+				},
+				{
+					"name": "Execute Plan by Plan ID (Asynchronous)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save testId, planId and scenarioId to environment variables",
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    pm.environment.set('testId', jsonData.testId);",
+									"    if (jsonData.planId) {",
+									"        pm.environment.set('planId', jsonData.planId);",
+									"        console.log('Plan ID:', jsonData.planId);",
+									"    }",
+									"    if (jsonData.scenarioId) {",
+									"        pm.environment.set('scenarioId', jsonData.scenarioId);",
+									"        console.log('Scenario ID:', jsonData.scenarioId);",
+									"    }",
+									"    console.log('Test ID:', jsonData.testId);",
+									"    console.log('Status:', jsonData.status);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/plans/{{planId}}/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plans", "{{planId}}", "execute-async"]
+						},
+						"description": "Execute a plan by plan ID asynchronously (returns immediately with testId). Returns immediately with testId and planId. failFast (default: true) determines if execution stops on first error."
+					},
+					"response": []
+				}
+			],
+			"description": "Async execution endpoints for long-running tests. The unified executor automatically chooses DOM or Vision for each step."
+		},
+		{
+			"name": "Examples",
+			"item": [
+				{
+					"name": "Simple Navigation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com and verify that the heading says \\\"Example Domain\\\"\",\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "execute-async"]
+						},
+						"description": "Simple navigation and verification example"
+					},
+					"response": []
+				},
+				{
+					"name": "Wait Action Example",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com, wait 10 seconds and verify that the heading says \\\"Example Domain\\\"\",\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "execute-async"]
+						},
+						"description": "Example with wait action - waits 10 seconds before verification"
+					},
+					"response": []
+				},
+				{
+					"name": "Long Running Test (2 minutes)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com, wait 10 seconds, then navigate to https://www.wikipedia.org, wait 10 seconds, then navigate back to https://example.com, wait 10 seconds, verify the page title contains Example Domain, wait 10 seconds, verify the heading says Example Domain, wait 10 seconds, then navigate to https://www.google.com, wait 10 seconds, verify Google is in the page title, wait 10 seconds, navigate back to example.com, wait 10 seconds, and finally verify the page contains Example Domain text.\",\n  \"failFast\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "execute-async"]
+						},
+						"description": "A long-running test scenario that takes approximately 2 minutes to complete"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Plan for Login (Dry Run)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com, then login with email: user@example.com and password: <password>, wait for navigation to complete, and verify that login was successful by checking that the page shows a logged-in state or has navigated away from the login page.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/plan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "plan"]
+						},
+						"description": "Generate a plan for a login scenario without executing it (dry run). The unified executor will automatically choose DOM or Vision for each step during execution."
+					},
+					"response": []
+				},
+				{
+					"name": "Continue on Error (failFast: false)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scenario\": \"Navigate to https://example.com, verify heading contains InvalidText, then verify heading contains Example Domain\",\n  \"failFast\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/execute-async",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "execute-async"]
+						},
+						"description": "Example with failFast set to false - execution continues even if a step fails"
+					},
+					"response": []
+				}
+			],
+			"description": "Example scenarios for testing. All use unified executor that automatically chooses DOM or Vision."
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3001",
+			"type": "string"
+		},
+		{
+			"key": "testId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "scenarioId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "planId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

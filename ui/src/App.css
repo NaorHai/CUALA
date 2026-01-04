@@ -1,0 +1,162 @@
+/* Additional app-specific styles if needed */
+
+
+.toggle-steps {
+    position: absolute;
+    bottom: 10px;
+    right: 20px;
+}
+
+.logo-aura {
+    filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.5)) 
+            drop-shadow(0 0 40px rgba(59, 130, 246, 0.3))
+            drop-shadow(0 0 60px rgba(59, 130, 246, 0.2));
+    animation: aura-pulse 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.logo-aura-dark {
+    filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.6)) 
+            drop-shadow(0 0 40px rgba(34, 211, 238, 0.4))
+            drop-shadow(0 0 60px rgba(34, 211, 238, 0.3));
+    animation: aura-pulse-dark 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes aura-pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.5)) 
+                drop-shadow(0 0 40px rgba(59, 130, 246, 0.3))
+                drop-shadow(0 0 60px rgba(59, 130, 246, 0.2));
+    }
+    50% {
+        filter: drop-shadow(0 0 30px rgba(59, 130, 246, 0.7)) 
+                drop-shadow(0 0 50px rgba(59, 130, 246, 0.5))
+                drop-shadow(0 0 70px rgba(59, 130, 246, 0.3));
+    }
+}
+
+@keyframes aura-pulse-dark {
+    0%, 100% {
+        filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.6)) 
+                drop-shadow(0 0 40px rgba(34, 211, 238, 0.4))
+                drop-shadow(0 0 60px rgba(34, 211, 238, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 0 30px rgba(34, 211, 238, 0.8)) 
+                drop-shadow(0 0 50px rgba(34, 211, 238, 0.6))
+                drop-shadow(0 0 70px rgba(34, 211, 238, 0.4));
+    }
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;  /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Also hide scrollbar for any child elements */
+.scrollbar-hide * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-hide *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Dark mode chart styling */
+.dark .MuiChartsAxis-root .MuiChartsAxis-tick,
+.dark .MuiChartsAxis-root .MuiChartsAxis-tickLabel {
+  fill: rgba(255, 255, 255, 0.7) !important;
+}
+
+.dark .MuiChartsAxis-root .MuiChartsAxis-label {
+  fill: rgba(255, 255, 255, 0.9) !important;
+}
+
+.dark .MuiChartsAxis-root .MuiChartsAxis-line {
+  stroke: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .MuiChartsGrid-root .MuiChartsGrid-line {
+  stroke: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .MuiChartsLegend-root .MuiChartsLegend-mark,
+.dark .MuiChartsLegend-root .MuiChartsLegend-label,
+.dark .MuiChartsLegend-root text {
+  fill: rgba(255, 255, 255, 0.9) !important;
+}
+
+.dark .MuiChartsTooltip-root {
+  background-color: hsl(222.2, 84%, 4.9%) !important;
+  color: hsl(210, 40%, 98%) !important;
+  border: 1px solid hsl(217.2, 32.6%, 17.5%) !important;
+}
+
+/* Additional chart text elements - target all SVG text in charts, but exclude marks */
+.dark .MuiCard svg text:not([class*="Mark"]):not([class*="fill"]),
+.dark svg.MuiCharts-root text:not([class*="Mark"]):not([class*="fill"]),
+.dark .MuiCharts-root svg text:not([class*="Mark"]):not([class*="fill"]) {
+  fill: rgba(255, 255, 255, 0.9) !important;
+}
+
+.dark .MuiChartsAxis-root text {
+  fill: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Legend text specifically - only target text elements, not marks */
+.dark .MuiChartsLegend-root text,
+.dark .MuiChartsLegend-root .MuiChartsLegend-series text,
+.dark .MuiChartsLegend-root .MuiChartsLegend-item text {
+  fill: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Target the specific MuiChartsLabel-root MuiChartsLegend-label class - both container and text */
+.dark .MuiChartsLabel-root.MuiChartsLegend-label:not(.MuiChartsLabelMark-fill),
+.dark .MuiChartsLabel-root.MuiChartsLegend-label text,
+.dark .MuiChartsLegend-label.MuiChartsLabel-root:not(.MuiChartsLabelMark-fill),
+.dark .MuiChartsLegend-label.MuiChartsLabel-root text {
+  fill: rgba(255, 255, 255, 0.9) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Make sure all text in chart containers is visible - but exclude marks */
+.dark [class*="MuiCharts"] text:not([class*="Mark"]):not([class*="fill"]),
+.dark [class*="Charts"] text:not([class*="Mark"]):not([class*="fill"]) {
+  fill: rgba(255, 255, 255, 0.9) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Even more specific targeting - container and text elements, but not marks */
+.dark .MuiChartsLegend-root .MuiChartsLabel-root:not(.MuiChartsLabelMark-fill),
+.dark .MuiChartsLegend-root .MuiChartsLabel-root text,
+.dark .MuiChartsLegend-root .MuiChartsLabel-root.MuiChartsLegend-label:not(.MuiChartsLabelMark-fill),
+.dark .MuiChartsLegend-root .MuiChartsLabel-root.MuiChartsLegend-label text {
+  fill: rgba(255, 255, 255, 0.9) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Preserve legend mark colors - MuiChartsLabelMark-fill should keep its original fill color */
+/* Note: We use :not(.MuiChartsLabelMark-fill) in selectors above to exclude marks from text styling */
+
+/* Dark mode MUI Typography in cards - ensure all text is visible */
+.dark .MuiCard .MuiTypography-root {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.dark .MuiCard .MuiTypography-body2,
+.dark .MuiCard .MuiTypography-caption {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.dark .MuiCard .MuiTypography-colorTextSecondary {
+  color: rgba(255, 255, 255, 0.7) !important;
+}

@@ -1,0 +1,35 @@
+Verify if the following step was successful based on the provided state.
+Step Description: {{description}}
+Action Performed: {{action}}
+Execution Status: {{status}}
+Error (if any): {{error}}
+{{#domMetadata}}
+DOM Metadata: {{domMetadata}}
+{{/domMetadata}}
+{{#typedValue}}
+{{typedValue}}
+{{/typedValue}}
+
+CRITICAL VERIFICATION GUIDELINES:
+
+1. NAVIGATION ACTIONS (action.name === "navigate"):
+   - If Execution Status is SUCCESS: Navigation was successful - the page loaded
+   - DO NOT mark as failed if you see:
+     * Redirects to login pages
+     * "Access Denied" messages
+     * Authentication required pages
+     * Error messages on the page
+     * Different URL than expected (redirects are normal)
+   - These are VALID page states - the navigation succeeded, the page loaded successfully
+   - Only mark as failed if Execution Status is FAILURE or there's a network/connection error
+   - Example: If status is SUCCESS but page shows "Access Denied" → Navigation was SUCCESSFUL (page loaded), mark as verified
+
+2. TYPE ACTIONS:
+   - If typedValue is provided in metadata, use that DOM value for verification (more reliable than screenshots)
+   - Input field values may not be visible in screenshots (especially password fields or styled inputs), but the DOM value is reliable
+   - Check if Execution Status is SUCCESS first - if yes, verify the typed value matches
+
+3. OTHER ACTIONS:
+   - Check Execution Status first - SUCCESS means the action completed
+   - Verify based on whether the action achieved its intended result
+

@@ -1,0 +1,28 @@
+Find the CSS selector for the element described as: "{{description}}"
+
+Action Type: {{actionType}}
+Current URL: {{url}}
+
+DOM Structure (simplified):
+{{domStructure}}
+
+Instructions:
+- Analyze the DOM structure above
+- Find the element that best matches the description
+- Consider the action type ({{actionType}}) when selecting
+- Provide the most specific and reliable CSS selector
+- Include alternative selectors as fallbacks
+- Return confidence score based on match quality
+
+IMPORTANT FOR BUTTON DISCOVERY:
+- If description mentions "submit button", "login button", "submit", or similar button actions:
+  * Check BOTH <button> elements AND <input type="submit"> elements
+  * <input type="submit"> elements are valid buttons and can be clicked
+  * Match by id (e.g., #Login), name (e.g., input[name="Login"]), value text (e.g., input[value*="Log In"]), or type+context
+  * The "value" attribute of input submit buttons contains the visible button text
+- Example: For "the submit button or login button", look for:
+  * input[type="submit"][id="Login"]
+  * input[type="submit"][name="Login"]
+  * input[type="submit"][value*="Log In"]
+  * button#Login or button with text "Log In"
+

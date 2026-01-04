@@ -1,0 +1,41 @@
+Refine this execution plan based on the actual DOM structure.
+
+Original Plan:
+{{originalPlan}}
+
+Current DOM Structure (simplified):
+{{domStructure}}
+
+Current URL: {{url}}
+
+Executed Steps So Far:
+{{executedSteps}}
+
+Task:
+1. FIRST: Check if any steps are unnecessary based on current DOM state:
+   - Look for steps that say "click X to reveal Y", "open form/modal", "click to show", "reveal", etc. - check if Y/form/modal is already visible
+   - CRITICAL: If you see form elements (input[type="email"], input[type="password"], form tags) in the DOM structure, the login form is ALREADY VISIBLE on the page
+   - CRITICAL: If a step says "click login button to reveal login form" but the DOM shows email/password inputs, REMOVE that step immediately
+   - Analyze the DOM structure to see if forms, modals, or other UI elements mentioned in step descriptions are already present and visible
+   - Check for form elements (input[type="email"], input[type="password"], form tags) - if they exist in the DOM, the form is ALREADY VISIBLE, no need to click anything
+   - Check for modal/dialog elements with role="dialog" or class names containing "modal" - if they exist and are visible, the modal is open
+   - If a prerequisite step is no longer needed, mark it for removal
+   - Examples: 
+     * Step: "Click login button to reveal login form" → Check DOM for input[type="email"] or input[type="password"] → If found → REMOVE step (form is already visible)
+     * Step: "Click login button or link" when form is already visible → REMOVE step
+     * Step: "Open modal" → Check DOM for modal elements → If modal is visible → REMOVE step
+     * Step: "Click dropdown to open menu" → Check DOM for menu elements → If menu is visible → REMOVE step
+2. For steps that remain, analyze the DOM structure for each step that interacts with DOM elements
+3. Find the actual CSS selector for elements mentioned in step descriptions
+4. Update selectors with real DOM selectors from the structure above
+5. Provide confidence scores (0-1) for each selector
+6. Suggest alternative selectors as fallbacks
+7. Document all refinements in the refinements array
+8. Document all removed steps in the removedSteps array with reasons (be specific about why they're unnecessary)
+9. Keep steps that don't need DOM interaction (navigate, wait) unchanged
+
+Return the refined plan with:
+- Updated selectors and confidence scores for remaining steps (only include steps that are still needed)
+- List of removed steps with reasons in removedSteps array
+- All refinements documented in refinements array
+

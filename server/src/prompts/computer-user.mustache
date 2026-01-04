@@ -1,0 +1,12 @@
+{{intent}}
+
+ANALYSIS PROCESS:
+1. First, check if the requested element/form is visible on the page.
+2. If looking for an input field (email, password, username, etc.):
+   - Check if a login/signup form is visible
+   - If form is NOT visible: Find the button/link that opens it (e.g., "Login", "Sign in", "התחבר") and return those coordinates
+   - If form IS visible: Return coordinates for the requested input field
+3. For other elements: Return coordinates for the element itself, or the trigger that reveals it if not visible.
+
+Return ONLY a JSON object: {"x": number, "y": number}
+

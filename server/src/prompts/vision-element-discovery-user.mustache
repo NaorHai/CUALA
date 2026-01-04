@@ -1,0 +1,18 @@
+Current URL: {{url}}
+
+Description: "{{description}}"
+Action Type: {{actionType}}
+
+DOM Structure:
+{{domStructure}}
+
+Analyze the screenshot to understand the visual context, then use the DOM structure to find the CSS selector for the element described.
+
+CRITICAL INSTRUCTIONS:
+1. Look at the screenshot to identify if the semantic concept (e.g., "login form", "modal") is visually present
+2. If visually present, find the corresponding container element in the DOM structure
+3. Extract the CSS selector for that container element
+4. For specific elements (buttons, inputs), identify them visually first, then find their DOM selector
+5. Return a CSS selector (NEVER pixel coordinates) that can be used for DOM-based execution
+6. Provide confidence score and alternative selectors
+
