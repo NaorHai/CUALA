@@ -102,7 +102,7 @@
 					"host": ["{{baseUrl}}"],
 					"path": ["api", "plan"]
 				},
-				"description": "Generate an execution plan without executing it (dry run). Useful for testing and debugging to see what plan would be generated. The unified executor will automatically choose DOM or Vision for each step during execution.\n\n**Response Fields:**\n- `success` (boolean): Always `true` for successful responses\n- `alreadyExists` (boolean): `true` if the plan already existed for this scenario, `false` if a new plan was created\n- `planId` (string): The plan identifier\n- `scenarioId` (string): The scenario identifier\n- `name` (string): Human-readable plan name\n- `steps` (array): Array of execution steps\n- `totalSteps` (number): Total number of steps\n- `message` (string): Descriptive message indicating whether plan was reused or newly created"
+				"description": "Generate an execution plan without executing it (dry run). Useful for testing and debugging to see what plan would be generated. The unified executor will automatically choose DOM or Vision for each step during execution.\n\n**Response Fields:**\n- `success` (boolean): Always `true` for successful responses\n- `alreadyExists` (boolean): `true` if the plan already existed for this scenario, `false` if a new plan was created\n- `planId` (string): The plan identifier\n- `scenarioId` (string): The scenario identifier\n- `scenario` (string): The original scenario text/description\n- `name` (string): Human-readable plan name\n- `steps` (array): Array of execution steps\n- `totalSteps` (number): Total number of steps\n- `message` (string): Descriptive message indicating whether plan was reused or newly created"
 			},
 			"response": []
 		},
@@ -301,7 +301,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "get-plan", "{{planId}}"]
 						},
-						"description": "Get the execution plan by planId. Use planId from execution status or latest execution response."
+						"description": "Get the execution plan by planId. Use planId from execution status or latest execution response.\n\n**Response Fields:**\n- `planId` (string): The plan identifier\n- `scenarioId` (string): The scenario identifier\n- `scenario` (string): The original scenario text/description\n- `name` (string): Human-readable plan name\n- `phase` (string): Plan phase (initial, refined, adaptive)\n- `steps` (array): Array of execution steps\n- `refinementHistory` (array): History of plan refinements\n- `createdAt` (number): Timestamp when plan was created"
 					},
 					"response": []
 				},
@@ -315,7 +315,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "list-plans"]
 						},
-						"description": "List all execution plans. Returns a list of all plans with their details including plan ID, name, scenario ID, steps count, and creation time. Results are sorted by creation time (newest first)."
+						"description": "List all execution plans. Returns a list of all plans with their details including plan ID, name, scenario ID, scenario text, steps count, and creation time. Results are sorted by creation time (newest first).\n\n**Response Fields:**\n- `totalPlans` (number): Total number of plans\n- `plans` (array): Array of plan objects, each containing:\n  - `planId` (string): The plan identifier\n  - `scenarioId` (string): The scenario identifier\n  - `scenario` (string): The original scenario text/description\n  - `name` (string): Human-readable plan name\n  - `phase` (string): Plan phase (initial, refined, adaptive)\n  - `totalSteps` (number): Total number of steps\n  - `createdAt` (number): Timestamp when plan was created\n  - `steps` (array): Array of step summaries"
 					},
 					"response": []
 				},
