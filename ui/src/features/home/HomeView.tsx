@@ -69,30 +69,9 @@ export const HomeView = () => {
 
   return (
     <>
-      <div className="w-full max-w-7xl mx-auto">
+      <div className="w-full max-w-7xl mx-auto mt-12">
         <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-          {/* Create Plan Container - Left */}
-          <Card className="flex-1 flex flex-col">
-            <CardHeader>
-              <CardTitle>Create Plan</CardTitle>
-              <CardDescription>
-                Generate an execution plan without executing it
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
-              <div className="flex justify-center items-center flex-1">
-                <Button
-                  onClick={() => setShowPlanModal(true)}
-                  size="lg"
-                  className="w-full max-w-md"
-                >
-                  Create Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Scenario Agent Flow Container - Middle/Center */}
+          {/* Scenario Agent Flow Container - Left */}
           <Card className="flex-1 flex flex-col">
             <CardHeader>
               <CardTitle>Scenario Agent Flow</CardTitle>
@@ -108,6 +87,27 @@ export const HomeView = () => {
                   className="w-full max-w-md"
                 >
                   New Scenario
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Create Plan Container - Right */}
+          <Card className="flex-1 flex flex-col">
+            <CardHeader>
+              <CardTitle>Create Plan</CardTitle>
+              <CardDescription>
+                Generate an execution plan without executing it
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              <div className="flex justify-center items-center flex-1">
+                <Button
+                  onClick={() => setShowPlanModal(true)}
+                  size="lg"
+                  className="w-full max-w-md"
+                >
+                  Create Plan
                 </Button>
               </div>
             </CardContent>

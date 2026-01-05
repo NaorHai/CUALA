@@ -501,6 +501,14 @@ export const ReportsView = () => {
                               const isFailed = status.status === 'failed' && status.currentStep === stepNumber
                               const isPending = !isCompleted && !isCurrent
                               
+                              // Get step details if available
+                              const fullStatus = fullStatuses.get(status.testId)
+                              const stepData = fullStatus && (fullStatus.steps || fullStatus.results) 
+                                ? ((fullStatus.steps || fullStatus.results || []) as ExecutionStep[])[index]
+                                : null
+                              const stepDescription = stepData?.description || `Step ${stepNumber}`
+                              const stepStatusText = isCompleted ? ' (Completed)' : isCurrent ? ' (Current)' : isFailed ? ' (Failed)' : ' (Pending)'
+                              
                               return (
                                 <div key={stepNumber} className="flex items-center">
                                   <div
@@ -511,7 +519,7 @@ export const ReportsView = () => {
                                       isFailed && "bg-red-500 border-red-600",
                                       isPending && "bg-muted border-border"
                                     )}
-                                    title={`Step ${stepNumber}${isCompleted ? ' (Completed)' : isCurrent ? ' (Current)' : isFailed ? ' (Failed)' : ' (Pending)'}`}
+                                    title={`${stepDescription}${stepStatusText}`}
                                   >
                                     {isCompleted && <Check className="h-2.5 w-2.5 text-white" />}
                                     {isFailed && <X className="h-2.5 w-2.5 text-white" />}
@@ -532,21 +540,6 @@ export const ReportsView = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 bg-muted rounded-full h-2">
-                            <div
-                              className={cn(
-                                "h-2 rounded-full transition-all",
-                                status.status === 'completed' && "bg-green-500",
-                                status.status === 'failed' && "bg-red-500",
-                                status.status === 'running' && "bg-blue-500",
-                                status.status === 'pending' && "bg-yellow-500"
-                              )}
-                              style={{ width: `${status.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{status.progress}%</span>
-                        </div>
                       </div>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground font-mono">
@@ -672,7 +665,6 @@ export const ReportsView = () => {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between text-sm">
                               <span>Step {status.currentStep || 0} of {status.totalSteps}</span>
-                              <span>{status.progress}%</span>
                             </div>
                             
                             {/* Step Progress Bar */}
@@ -700,12 +692,13 @@ export const ReportsView = () => {
                                     <div className="flex flex-col items-center min-w-[60px]">
                                       <div
                                         className={cn(
-                                          "relative w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all",
+                                          "relative w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all cursor-pointer",
                                           isCompleted && "bg-green-500 border-green-600 text-white",
                                           isCurrent && !isFailed && "bg-blue-500 border-blue-600 text-white animate-pulse",
                                           isFailed && "bg-red-500 border-red-600 text-white",
                                           isPending && "bg-muted border-border text-muted-foreground"
                                         )}
+                                        title={stepData?.description || `Step ${stepNumber}`}
                                       >
                                         {isCompleted ? (
                                           <Check className="h-5 w-5" />
@@ -734,20 +727,6 @@ export const ReportsView = () => {
                                   </div>
                                 )
                               })}
-                            </div>
-                            
-                            {/* Percentage Progress Bar */}
-                            <div className="w-full bg-muted rounded-full h-2">
-                              <div
-                                className={cn(
-                                  "h-2 rounded-full transition-all",
-                                  status.status === 'completed' && "bg-green-500",
-                                  status.status === 'failed' && "bg-red-500",
-                                  status.status === 'running' && "bg-blue-500",
-                                  status.status === 'pending' && "bg-yellow-500"
-                                )}
-                                style={{ width: `${status.progress}%` }}
-                              />
                             </div>
                           </div>
                         </div>

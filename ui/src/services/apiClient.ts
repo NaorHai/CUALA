@@ -52,6 +52,16 @@ export interface ExecutionStatus {
   reason?: string
 }
 
+export interface ConfidenceThreshold {
+  actionType: 'click' | 'type' | 'hover' | 'verify' | 'default'
+  threshold: number
+}
+
+export interface ConfidenceThresholdsResponse {
+  thresholds: ConfidenceThreshold[]
+  total: number
+}
+
 class APIClient {
   private baseUrl: string
 
@@ -311,6 +321,44 @@ class APIClient {
   async deleteExecution(testId: string): Promise<{ success: boolean; testId: string; message: string }> {
     const response = await fetch(`${this.baseUrl}/api/executions/${testId}`, {
       method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(error.message || error.error || `Request failed: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get all confidence thresholds
+   */
+  async getConfidenceThresholds(): Promise<ConfidenceThresholdsResponse> {
+    const response = await fetch(`${this.baseUrl}/api/confidence-thresholds`)
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(error.message || error.error || `Request failed: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Update confidence threshold for a specific action type
+   */
+  async updateConfidenceThreshold(
+    actionType: 'click' | 'type' | 'hover' | 'verify' | 'default',
+    threshold: number,
+    description?: string
+  ): Promise<{ actionType: string; threshold: number; configKey: string; message: string }> {
+    const response = await fetch(`${this.baseUrl}/api/confidence-thresholds/${actionType}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ threshold, description }),
     })
 
     if (!response.ok) {
