@@ -54,7 +54,7 @@ export const ReportsView = () => {
   const [fullStatuses, setFullStatuses] = useState<Map<string, ExecutionStatus>>(new Map())
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const [visibleImages, setVisibleImages] = useState<Set<string>>(new Set())
-  const [viewMode, setViewMode] = useState<ViewMode>('card')
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [visibleCount, setVisibleCount] = useState<number>(20)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
