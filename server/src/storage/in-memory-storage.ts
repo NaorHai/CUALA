@@ -7,7 +7,7 @@
  * share the same scenarioId and can be queried together.
  */
 
-import { IStorage, IExecutionState } from './index.js';
+import { IStorage, IExecutionState, IConfiguration } from './index.js';
 import { IExecutionPlan } from '../types/index.js';
 import { createHash } from 'crypto';
 
@@ -218,6 +218,57 @@ export class InMemoryStorage implements IStorage {
     
     // Clear all scenario plan mappings
     this.scenarioPlans.clear();
+  }
+
+  // Configuration Storage
+  private configurations: Map<string, IConfiguration> = new Map();
+
+  async getConfiguration(key: string): Promise<IConfiguration | null> {
+    return this.configurations.get(key) || null;
+  }
+
+  async getAllConfigurations(prefix?: string): Promise<IConfiguration[]> {
+    const allConfigs = Array.from(this.configurations.values());
+    if (!prefix) {
+      return allConfigs;
+    }
+    return allConfigs.filter(config => config.key.startsWith(prefix));
+  }
+
+  async setConfiguration(key: string, value: unknown, description?: string): Promise<void> {
+    const existing = this.configurations.get(key);
+    const now = Date.now();
+    
+    const config: IConfiguration = {
+      id: existing?.id || `config-${now}-${Math.random().toString(36).substr(2, 9)}`,
+      key,
+      value,
+      description: description || existing?.description,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+    
+    this.configurations.set(key, config);
+  }
+
+  async deleteConfiguration(key: string): Promise<void> {
+    this.configurations.delete(key);
+  }
+
+  async deleteAllConfigurations(prefix?: string): Promise<void> {
+    if (!prefix) {
+      this.configurations.clear();
+      return;
+    }
+    
+    // Delete all configurations with the given prefix
+    const keysToDelete: string[] = [];
+    for (const [key] of this.configurations.entries()) {
+      if (key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => this.configurations.delete(key));
   }
 }
 

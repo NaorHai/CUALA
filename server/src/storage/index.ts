@@ -106,5 +106,27 @@ export interface IStorage {
    * Generate scenarioId from scenario description (for lookup purposes)
    */
   generateScenarioId(scenario: string): string;
+
+  /**
+   * Configuration Management
+   * Generic configuration storage that can be extended for any configuration property
+   */
+  getConfiguration(key: string): Promise<IConfiguration | null>;
+  getAllConfigurations(prefix?: string): Promise<IConfiguration[]>;
+  setConfiguration(key: string, value: unknown, description?: string): Promise<void>;
+  deleteConfiguration(key: string): Promise<void>;
+  deleteAllConfigurations(prefix?: string): Promise<void>;
+}
+
+/**
+ * Configuration entity interface
+ */
+export interface IConfiguration {
+  id: string;
+  key: string;
+  value: unknown;
+  description?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 

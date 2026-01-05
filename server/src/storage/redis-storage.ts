@@ -11,7 +11,7 @@
  * - plans:all -> Set of all planIds
  */
 
-import { IStorage, IExecutionState } from './index.js';
+import { IStorage, IExecutionState, IConfiguration } from './index.js';
 import { IExecutionPlan } from '../types/index.js';
 import { createHash } from 'crypto';
 import { createClient, type RedisClientType } from 'redis';
@@ -387,6 +387,89 @@ export class RedisStorage implements IStorage {
     
     // Clear the all plans set
     await this.client.del('plans:all');
+  }
+
+  // Configuration Storage
+  async getConfiguration(key: string): Promise<IConfiguration | null> {
+    await this.ensureConnected();
+    const data = await this.client.get(`config:${key}`);
+    if (!data) {
+      return null;
+    }
+    try {
+      return JSON.parse(data) as IConfiguration;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async getAllConfigurations(prefix?: string): Promise<IConfiguration[]> {
+    await this.ensureConnected();
+    const pattern = prefix ? `config:${prefix}*` : 'config:*';
+    const keys = await this.client.keys(pattern);
+    const configurations: IConfiguration[] = [];
+    
+    for (const key of keys) {
+      const data = await this.client.get(key);
+      if (data) {
+        try {
+          const config = JSON.parse(data) as IConfiguration;
+          configurations.push(config);
+        } catch (error) {
+          // Skip invalid configurations
+        }
+      }
+    }
+    
+    return configurations;
+  }
+
+  async setConfiguration(key: string, value: unknown, description?: string): Promise<void> {
+    await this.ensureConnected();
+    const existing = await this.getConfiguration(key);
+    const now = Date.now();
+    
+    const config: IConfiguration = {
+      id: existing?.id || `config-${now}-${Math.random().toString(36).substr(2, 9)}`,
+      key,
+      value,
+      description: description || existing?.description,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+    
+    await this.client.set(`config:${key}`, JSON.stringify(config));
+    
+    // Add to all configurations set for quick lookup
+    await this.client.sAdd('configs:all', key);
+  }
+
+  async deleteConfiguration(key: string): Promise<void> {
+    await this.ensureConnected();
+    await this.client.del(`config:${key}`);
+    await this.client.sRem('configs:all', key);
+  }
+
+  async deleteAllConfigurations(prefix?: string): Promise<void> {
+    await this.ensureConnected();
+    const pattern = prefix ? `config:${prefix}*` : 'config:*';
+    const keys = await this.client.keys(pattern);
+    
+    if (keys.length > 0) {
+      await this.client.del(keys);
+      
+      // Remove from all configurations set
+      if (prefix) {
+        // Remove only keys matching the prefix
+        const configKeys = keys.map(k => k.replace('config:', ''));
+        if (configKeys.length > 0) {
+          await this.client.sRem('configs:all', configKeys);
+        }
+      } else {
+        // Clear the entire set
+        await this.client.del('configs:all');
+      }
+    }
   }
 }
 

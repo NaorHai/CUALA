@@ -2,15 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import { runScenario, runScenarioAsync, generatePlan, generatePlanAsync, runPlan, runPlanAsync } from './index.js';
 import { WinstonLogger } from './infra/logger.js';
+import { EnvConfig } from './infra/config.js';
+import { SafetyChecker } from './infra/safety-checker.js';
+import { ConfidenceThresholdService } from './infra/confidence-threshold-service.js';
 import { createStorage } from './storage/storage-factory.js';
 import { IExecutionPlan } from './types/index.js';
+import { ActionType } from './types/confidence-threshold.js';
+import { getConfidenceThresholdKey, extractActionTypeFromKey } from './types/config.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
 const logger = new WinstonLogger();
+const config = new EnvConfig();
+
+// Initialize safety checker
+const safetyChecker = new SafetyChecker(config, logger);
 
 // Initialize storage (will be set in async initialization)
 let storage: Awaited<ReturnType<typeof createStorage>>;
+let confidenceThresholdService: ConfidenceThresholdService;
 
 app.use(cors());
 app.use(express.json());
@@ -199,6 +209,11 @@ app.post('/', (req, res) => {
         path: '/api/get-all-statuses',
         description: 'Get all test execution statuses'
       },
+      deleteExecution: {
+        method: 'DELETE',
+        path: '/api/executions/:testId',
+        description: 'Delete a specific execution by test ID'
+      },
       deleteAllExecutions: {
         method: 'DELETE',
         path: '/api/executions',
@@ -342,6 +357,20 @@ app.post('/api/execute', async (req, res) => {
   if (!scenario) {
     logger.warn(`[${requestId}] API Request rejected: Missing scenario or planId`);
     return res.status(400).json({ error: 'Either scenario description or planId is required' });
+  }
+
+  // Safety check for scenario
+  const safetyCheck = await safetyChecker.checkScenario(scenario);
+  if (!safetyCheck.isSafe) {
+    logger.warn(`[${requestId}] Scenario failed safety check`, { 
+      reason: safetyCheck.reason,
+      categories: safetyCheck.categories 
+    });
+    return res.status(400).json({ 
+      error: 'Scenario failed safety check',
+      message: safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.',
+      details: safetyCheck.categories ? { flaggedCategories: safetyCheck.categories } : undefined
+    });
   }
 
   try {
@@ -505,6 +534,20 @@ app.post('/api/execute-async', async (req, res) => {
   if (!scenario) {
     logger.warn(`[${requestId}] Async API Request rejected: Missing scenario or planId`);
     return res.status(400).json({ error: 'Either scenario description or planId is required' });
+  }
+
+  // Safety check for scenario
+  const safetyCheck = await safetyChecker.checkScenario(scenario);
+  if (!safetyCheck.isSafe) {
+    logger.warn(`[${requestId}] Scenario failed safety check`, { 
+      reason: safetyCheck.reason,
+      categories: safetyCheck.categories 
+    });
+    return res.status(400).json({ 
+      error: 'Scenario failed safety check',
+      message: safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.',
+      details: safetyCheck.categories ? { flaggedCategories: safetyCheck.categories } : undefined
+    });
   }
 
   try {
@@ -984,6 +1027,55 @@ app.get('/api/get-all-statuses', async (req, res) => {
   }
 });
 
+// Delete a specific execution by test ID
+app.delete('/api/executions/:testId', async (req, res) => {
+  const { testId } = req.params;
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Delete execution request for testId: ${testId}`);
+  console.log(`[${requestId}] Delete execution request for testId: ${testId}`);
+  
+  try {
+    // Check if execution exists
+    const execution = await storage.getExecution(testId);
+    if (!execution) {
+      logger.warn(`[${requestId}] Execution not found for deletion`, { testId });
+      return res.status(404).json({
+        error: 'Execution not found',
+        testId,
+        message: `No execution found with test ID: ${testId}`
+      });
+    }
+    
+    // Delete the execution
+    await storage.deleteExecution(testId);
+    
+    logger.info(`[${requestId}] Execution deleted successfully`, { 
+      testId,
+      scenarioId: execution.scenarioId,
+      status: execution.status
+    });
+    console.log(`[${requestId}] Execution deleted successfully: ${testId}`);
+    
+    return res.json({
+      success: true,
+      testId,
+      scenarioId: execution.scenarioId,
+      message: `Execution ${testId} deleted successfully`
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error deleting execution`, error);
+    console.error(`[${requestId}] Error deleting execution:`, errorMessage);
+    
+    return res.status(500).json({
+      error: 'Failed to delete execution',
+      testId,
+      message: errorMessage
+    });
+  }
+});
+
 // Delete all executions
 app.delete('/api/executions', async (req, res) => {
   const requestId = `req-${Date.now()}`;
@@ -1324,6 +1416,20 @@ app.post('/api/get-scenario-id', async (req, res) => {
     return res.status(400).json({ error: 'Scenario description is required' });
   }
 
+  // Safety check for scenario
+  const safetyCheck = await safetyChecker.checkScenario(scenario);
+  if (!safetyCheck.isSafe) {
+    logger.warn(`[${requestId}] Scenario failed safety check`, { 
+      reason: safetyCheck.reason,
+      categories: safetyCheck.categories 
+    });
+    return res.status(400).json({ 
+      error: 'Scenario failed safety check',
+      message: safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.',
+      details: safetyCheck.categories ? { flaggedCategories: safetyCheck.categories } : undefined
+    });
+  }
+
   try {
     const scenarioId = storage.generateScenarioId(scenario);
     return res.json({
@@ -1351,6 +1457,20 @@ app.post('/api/plan', async (req, res) => {
   if (!scenario) {
     logger.warn(`[${requestId}] Plan generation request rejected: Missing scenario`);
     return res.status(400).json({ error: 'Scenario description is required' });
+  }
+
+  // Safety check for scenario
+  const safetyCheck = await safetyChecker.checkScenario(scenario);
+  if (!safetyCheck.isSafe) {
+    logger.warn(`[${requestId}] Scenario failed safety check`, { 
+      reason: safetyCheck.reason,
+      categories: safetyCheck.categories 
+    });
+    return res.status(400).json({ 
+      error: 'Scenario failed safety check',
+      message: safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.',
+      details: safetyCheck.categories ? { flaggedCategories: safetyCheck.categories } : undefined
+    });
   }
 
   try {
@@ -1630,6 +1750,20 @@ app.post('/api/slack/command', async (req, res) => {
       case 'execute': {
         logger.info(`[${requestId}] Executing scenario via Slack: "${parsed.scenario}"`);
         
+        // Safety check for scenario
+        const safetyCheck = await safetyChecker.checkScenario(parsed.scenario);
+        if (!safetyCheck.isSafe) {
+          logger.warn(`[${requestId}] Scenario failed safety check via Slack`, { 
+            reason: safetyCheck.reason,
+            categories: safetyCheck.categories 
+          });
+          return res.json(formatSlackResponse(
+            `🚫 *Safety Check Failed*\n\n` +
+            `*Reason:* ${safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.'}\n\n` +
+            `Please provide a valid test scenario description.`
+          ));
+        }
+        
         const result = await runScenario(parsed.scenario, parsed.failFast ?? true, storage);
         
         if (result) {
@@ -1662,6 +1796,20 @@ app.post('/api/slack/command', async (req, res) => {
       case 'execute-async': {
         logger.info(`[${requestId}] Starting async execution via Slack: "${parsed.scenario}"`);
         
+        // Safety check for scenario
+        const safetyCheck = await safetyChecker.checkScenario(parsed.scenario);
+        if (!safetyCheck.isSafe) {
+          logger.warn(`[${requestId}] Scenario failed safety check via Slack`, { 
+            reason: safetyCheck.reason,
+            categories: safetyCheck.categories 
+          });
+          return res.json(formatSlackResponse(
+            `🚫 *Safety Check Failed*\n\n` +
+            `*Reason:* ${safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.'}\n\n` +
+            `Please provide a valid test scenario description.`
+          ));
+        }
+        
         const testId = await storage.createExecution(parsed.scenario);
         const execution = await storage.getExecution(testId);
         
@@ -1680,6 +1828,20 @@ app.post('/api/slack/command', async (req, res) => {
       
       case 'plan': {
         logger.info(`[${requestId}] Generating plan via Slack (async): "${parsed.scenario}"`);
+        
+        // Safety check for scenario
+        const safetyCheck = await safetyChecker.checkScenario(parsed.scenario);
+        if (!safetyCheck.isSafe) {
+          logger.warn(`[${requestId}] Scenario failed safety check via Slack`, { 
+            reason: safetyCheck.reason,
+            categories: safetyCheck.categories 
+          });
+          return res.json(formatSlackResponse(
+            `🚫 *Safety Check Failed*\n\n` +
+            `*Reason:* ${safetyCheck.reason || 'The provided scenario contains inappropriate or malicious content and cannot be processed.'}\n\n` +
+            `Please provide a valid test scenario description.`
+          ));
+        }
         
         // Check if a plan already exists for this scenario
         const scenarioId = storage.generateScenarioId(parsed.scenario);
@@ -2130,6 +2292,186 @@ app.post('/api/slack/command', async (req, res) => {
   }
 });
 
+// ============================================================================
+// Confidence Threshold Management Endpoints
+// ============================================================================
+
+// Get all confidence thresholds
+app.get('/api/confidence-thresholds', async (req, res) => {
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Get all confidence thresholds request`);
+  
+  try {
+    const thresholds = await confidenceThresholdService.getAllThresholds();
+    const thresholdsArray = Array.from(thresholds.entries()).map(([actionType, threshold]) => ({
+      actionType,
+      threshold
+    }));
+    
+    return res.json({
+      thresholds: thresholdsArray,
+      total: thresholdsArray.length
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error getting confidence thresholds`, error);
+    return res.status(500).json({
+      error: 'Failed to get confidence thresholds',
+      message: errorMessage
+    });
+  }
+});
+
+// Get confidence threshold for a specific action type
+app.get('/api/confidence-thresholds/:actionType', async (req, res) => {
+  const { actionType } = req.params;
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Get confidence threshold request for actionType: ${actionType}`);
+  
+  try {
+    const threshold = await confidenceThresholdService.getThreshold(actionType as ActionType);
+    const configKey = `confidence.threshold.${actionType}`;
+    const config = await storage.getConfiguration(configKey);
+    
+    return res.json({
+      actionType,
+      threshold,
+      isDefault: !config,
+      config: config ? {
+        id: config.id,
+        description: config.description,
+        updatedAt: config.updatedAt
+      } : null
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error getting confidence threshold`, error);
+    return res.status(500).json({
+      error: 'Failed to get confidence threshold',
+      message: errorMessage
+    });
+  }
+});
+
+// Create or update confidence threshold
+app.put('/api/confidence-thresholds/:actionType', async (req, res) => {
+  const { actionType } = req.params;
+  const { threshold, description } = req.body;
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Set confidence threshold request`, { actionType, threshold });
+  
+  if (threshold === undefined || threshold === null) {
+    return res.status(400).json({ 
+      error: 'Threshold value is required',
+      message: 'Please provide a threshold value between 0.0 and 1.0'
+    });
+  }
+  
+  // Validate threshold range
+  if (typeof threshold !== 'number' || threshold < 0 || threshold > 1) {
+    return res.status(400).json({ 
+      error: 'Invalid threshold value',
+      message: 'Threshold must be a number between 0.0 and 1.0'
+    });
+  }
+  
+  // Validate action type
+  const validActionTypes: ActionType[] = ['click', 'type', 'hover', 'verify', 'default'];
+  if (!validActionTypes.includes(actionType as ActionType)) {
+    return res.status(400).json({ 
+      error: 'Invalid action type',
+      message: `Action type must be one of: ${validActionTypes.join(', ')}`,
+      validActionTypes
+    });
+  }
+  
+  try {
+    const configKey = `confidence.threshold.${actionType}`;
+    await storage.setConfiguration(configKey, threshold, description);
+    
+    logger.info(`[${requestId}] Confidence threshold set successfully`, { actionType, threshold, configKey });
+    
+    return res.json({
+      actionType,
+      threshold,
+      configKey,
+      message: `Confidence threshold for ${actionType} set to ${threshold}`
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error setting confidence threshold`, error);
+    return res.status(500).json({
+      error: 'Failed to set confidence threshold',
+      message: errorMessage
+    });
+  }
+});
+
+// Delete confidence threshold (revert to default)
+app.delete('/api/confidence-thresholds/:actionType', async (req, res) => {
+  const { actionType } = req.params;
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Delete confidence threshold request for actionType: ${actionType}`);
+  
+  try {
+    const configKey = `confidence.threshold.${actionType}`;
+    await storage.deleteConfiguration(configKey);
+    
+    // Get default threshold to return
+    const defaultThreshold = await confidenceThresholdService.getThreshold(actionType as ActionType);
+    
+    logger.info(`[${requestId}] Confidence threshold deleted, reverted to default`, { actionType, defaultThreshold });
+    
+    return res.json({
+      actionType,
+      threshold: defaultThreshold,
+      message: `Confidence threshold for ${actionType} deleted, reverted to default: ${defaultThreshold}`
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error deleting confidence threshold`, error);
+    return res.status(500).json({
+      error: 'Failed to delete confidence threshold',
+      message: errorMessage
+    });
+  }
+});
+
+// Delete all confidence thresholds (revert all to defaults)
+app.delete('/api/confidence-thresholds', async (req, res) => {
+  const requestId = `req-${Date.now()}`;
+  
+  logger.info(`[${requestId}] Delete all confidence thresholds request`);
+  
+  try {
+    await storage.deleteAllConfigurations('confidence.threshold.');
+    
+    logger.info(`[${requestId}] All confidence thresholds deleted, reverted to defaults`);
+    
+    return res.json({
+      message: 'All confidence thresholds deleted, reverted to defaults',
+      defaults: {
+        click: 0.5,
+        type: 0.7,
+        hover: 0.7,
+        verify: 0.7,
+        default: 0.6
+      }
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${requestId}] Error deleting all confidence thresholds`, error);
+    return res.status(500).json({
+      error: 'Failed to delete all confidence thresholds',
+      message: errorMessage
+    });
+  }
+});
+
 // List all execution plans endpoint
 app.get('/api/list-plans', async (req, res) => {
   const requestId = `req-${Date.now()}`;
@@ -2191,6 +2533,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     const storageType = process.env.STORAGE_TYPE || 'memory';
     logger.info(`Storage initialized: ${storageType}`);
     console.log(`Storage initialized: ${storageType}`);
+    
+    // Initialize confidence threshold service
+    confidenceThresholdService = new ConfidenceThresholdService(storage, logger);
+    logger.info('Confidence threshold service initialized');
     
     app.listen(port, () => {
       logger.info(`CUALA API Server started on port ${port}`);
