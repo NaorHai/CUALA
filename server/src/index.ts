@@ -613,6 +613,7 @@ export async function generatePlanAsync(
       const reusedPlan: IExecutionPlan = {
         ...latestPlan,
         id: planId, // Use the requested planId
+        scenario: latestPlan.scenario || description, // Ensure scenario text is preserved
         createdAt: latestPlan.createdAt || Date.now()
       };
       
@@ -691,6 +692,7 @@ export async function generatePlanAsync(
     const planWithPhase: IExecutionPlan = {
       ...plan,
       id: planId, // Use the provided planId
+      scenario: plan.scenario || description, // Ensure scenario text is stored
       phase: plan.phase || 'initial',
       name: planName,
       createdAt: plan.createdAt || Date.now()
@@ -789,6 +791,7 @@ export async function generatePlan(
     // Ensure plan has phase and name set (default to 'initial' if not set)
     const planWithPhase: IExecutionPlan = {
       ...plan,
+      scenario: plan.scenario || description, // Ensure scenario text is stored
       phase: plan.phase || 'initial',
       name: plan.name || await generatePlanName(description),
       createdAt: plan.createdAt || Date.now()

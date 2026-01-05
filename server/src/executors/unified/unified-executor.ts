@@ -333,7 +333,9 @@ export class UnifiedExecutor implements IExecutor {
   private async handleNavigate(args: Record<string, unknown>): Promise<IExecutionResult> {
     const url = args.url as string;
     if (!url) throw new Error('Missing URL for navigate action');
-    await this.page!.goto(url, { waitUntil: 'networkidle' });
+    // Use 'load' instead of 'networkidle' to avoid timeouts on pages with continuous network activity
+    // 'load' waits for the page load event (all resources loaded) without waiting for network idle
+    await this.page!.goto(url, { waitUntil: 'load', timeout: 30000 });
     return {
       stepId: (args as any).stepId || 'unknown',
       selector: undefined, // Navigation doesn't use a selector

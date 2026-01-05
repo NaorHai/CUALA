@@ -19,6 +19,7 @@ export type PlanPhase = 'initial' | 'refined' | 'adaptive';
 export interface IExecutionPlan {
   id: string;
   scenarioId: string;
+  scenario?: string; // The original scenario text/description
   name?: string; // Human-readable name for the plan
   steps: IStep[];
   phase?: PlanPhase; // Plan phase/type: initial (from planner), refined (after DOM inspection), adaptive (after recovery)

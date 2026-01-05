@@ -71,6 +71,7 @@ export class OpenAIPlanner implements IPlanner {
       return {
         id: `plan-${Date.now()}`,
         scenarioId: scenario.id,
+        scenario: scenario.description, // Store the original scenario text
         name: planName,
         steps,
         phase: 'initial', // Plans from base planner are always initial

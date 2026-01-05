@@ -1374,6 +1374,7 @@ app.post('/api/plan', async (req, res) => {
         success: true,
         planId: latestPlan.id,
         scenarioId: latestPlan.scenarioId,
+        scenario: latestPlan.scenario,
         name: latestPlan.name || 'Unnamed Plan',
         phase: latestPlan.phase || 'initial',
         steps: latestPlan.steps,
@@ -1398,6 +1399,7 @@ app.post('/api/plan', async (req, res) => {
       success: true,
       planId: plan.id,
       scenarioId: plan.scenarioId,
+      scenario: plan.scenario,
       name: plan.name || 'Unnamed Plan',
       phase: plan.phase || 'initial',
       steps: plan.steps,
@@ -1467,6 +1469,7 @@ app.get('/api/get-plan/:planId', async (req, res) => {
     return res.json({
       planId: plan.id,
       scenarioId: plan.scenarioId,
+      scenario: plan.scenario,
       name: plan.name || 'Unnamed Plan',
       phase: plan.phase || 'initial',
       steps: plan.steps, // Each step may contain an optional assertion field
@@ -2142,6 +2145,7 @@ app.get('/api/list-plans', async (req, res) => {
       plans: plans.map(plan => ({
         planId: plan.id,
         scenarioId: plan.scenarioId,
+        scenario: plan.scenario,
         name: plan.name || 'Unnamed Plan',
         phase: plan.phase || 'initial',
         totalSteps: plan.steps.length,
