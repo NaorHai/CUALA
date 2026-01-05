@@ -515,59 +515,301 @@
 				},
 				{
 					"name": "Get Confidence Threshold by Action Type",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "confidence-thresholds", "click"]
+					"item": [
+						{
+							"name": "Get Threshold for Click",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "click"]
+								},
+								"description": "Get confidence threshold for click actions. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The confidence threshold value (0.0 to 1.0)\n- `isDefault` (boolean): `true` if using default value, `false` if configured\n- `config` (object): Configuration metadata if configured"
+							},
+							"response": []
 						},
-						"description": "Get confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The confidence threshold value (0.0 to 1.0)\n- `isDefault` (boolean): `true` if using default value, `false` if configured\n- `config` (object): Configuration metadata if configured"
-					},
-					"response": []
+						{
+							"name": "Get Threshold for Type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/type",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "type"]
+								},
+								"description": "Get confidence threshold for type actions (input field interactions)."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Threshold for Hover",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/hover",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "hover"]
+								},
+								"description": "Get confidence threshold for hover actions."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Threshold for Verify",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/verify",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "verify"]
+								},
+								"description": "Get confidence threshold for verify actions (assertions)."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Threshold for Default",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/default",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "default"]
+								},
+								"description": "Get default confidence threshold (used when no specific action type threshold is configured)."
+							},
+							"response": []
+						}
+					],
+					"description": "Get confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`."
 				},
 				{
 					"name": "Set Confidence Threshold",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"threshold\": 0.6,\n  \"description\": \"Custom threshold for click actions\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+					"item": [
+						{
+							"name": "Set Threshold for Click",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"threshold\": 0.6,\n  \"description\": \"Custom threshold for click actions\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "click"]
+								},
+								"description": "Create or update confidence threshold for click actions. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Request Body:**\n- `threshold` (number, required): Confidence threshold value between 0.0 and 1.0\n- `description` (string, optional): Description of the threshold configuration\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The set threshold value\n- `configKey` (string): The configuration key used\n- `message` (string): Success message"
+							},
+							"response": []
 						},
-						"url": {
-							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "confidence-thresholds", "click"]
+						{
+							"name": "Set Threshold for Type",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"threshold\": 0.75,\n  \"description\": \"Custom threshold for type actions (input fields)\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/type",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "type"]
+								},
+								"description": "Create or update confidence threshold for type actions (input field interactions)."
+							},
+							"response": []
 						},
-						"description": "Create or update confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Request Body:**\n- `threshold` (number, required): Confidence threshold value between 0.0 and 1.0\n- `description` (string, optional): Description of the threshold configuration\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The set threshold value\n- `configKey` (string): The configuration key used\n- `message` (string): Success message"
-					},
-					"response": []
+						{
+							"name": "Set Threshold for Hover",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"threshold\": 0.65,\n  \"description\": \"Custom threshold for hover actions\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/hover",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "hover"]
+								},
+								"description": "Create or update confidence threshold for hover actions."
+							},
+							"response": []
+						},
+						{
+							"name": "Set Threshold for Verify",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"threshold\": 0.8,\n  \"description\": \"Custom threshold for verify actions (assertions)\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/verify",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "verify"]
+								},
+								"description": "Create or update confidence threshold for verify actions (assertions)."
+							},
+							"response": []
+						},
+						{
+							"name": "Set Threshold for Default",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"threshold\": 0.55,\n  \"description\": \"Custom default threshold (used when no specific action type threshold is configured)\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/default",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "default"]
+								},
+								"description": "Create or update default confidence threshold (used when no specific action type threshold is configured)."
+							},
+							"response": []
+						}
+					],
+					"description": "Create or update confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`."
 				},
 				{
 					"name": "Delete Confidence Threshold",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "confidence-thresholds", "click"]
+					"item": [
+						{
+							"name": "Delete Threshold for Click",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "click"]
+								},
+								"description": "Delete confidence threshold configuration for click actions, reverting to default value from .env file. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The default threshold value after deletion\n- `message` (string): Confirmation message"
+							},
+							"response": []
 						},
-						"description": "Delete a confidence threshold configuration, reverting it to the default value from .env file. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The default threshold value after deletion\n- `message` (string): Confirmation message"
-					},
-					"response": []
+						{
+							"name": "Delete Threshold for Type",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/type",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "type"]
+								},
+								"description": "Delete confidence threshold configuration for type actions, reverting to default value."
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Threshold for Hover",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/hover",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "hover"]
+								},
+								"description": "Delete confidence threshold configuration for hover actions, reverting to default value."
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Threshold for Verify",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/verify",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "verify"]
+								},
+								"description": "Delete confidence threshold configuration for verify actions, reverting to default value."
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Threshold for Default",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/confidence-thresholds/default",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "confidence-thresholds", "default"]
+								},
+								"description": "Delete default confidence threshold configuration, reverting to default value from .env file."
+							},
+							"response": []
+						}
+					],
+					"description": "Delete a confidence threshold configuration, reverting it to the default value from .env file. Valid action types: `click`, `type`, `hover`, `verify`, `default`."
 				},
 				{
 					"name": "Delete All Confidence Thresholds",
