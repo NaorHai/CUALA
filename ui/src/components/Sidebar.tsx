@@ -1,11 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { FileText, BarChart3, Home, Moon, Sun, LayoutDashboard } from 'lucide-react'
+import { FileText, BarChart3, Home, Moon, Sun, LayoutDashboard, Settings } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 export const Sidebar = () => {
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
   const menuItems = [
     {
@@ -73,7 +76,15 @@ export const Sidebar = () => {
         </nav>
       </div>
       
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border space-y-1">
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          <Settings className="h-5 w-5" />
+          <span>Settings</span>
+        </button>
+        <div className="border-t border-border my-1" />
         <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
@@ -87,6 +98,36 @@ export const Sidebar = () => {
           <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
         </button>
       </div>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              Configure your application settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">Theme</h4>
+              <p className="text-sm text-muted-foreground">
+                Current theme: {theme === 'light' ? 'Light' : 'Dark'}
+              </p>
+              <button
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-4 py-2 border rounded-md hover:bg-accent transition-colors"
+              >
+                <span className="text-sm">Switch to {theme === 'light' ? 'Dark' : 'Light'} Mode</span>
+                {theme === 'light' ? (
+                  <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }

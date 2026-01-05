@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { apiClient, ExecutionStatus } from '@/services/apiClient'
 import { uiNotificationService } from '@/services/uiNotificationService'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronRight, LayoutGrid, List, Search, Eye } from 'lucide-react'
+import { ChevronDown, ChevronRight, LayoutGrid, List, Search, Eye, Trash2, Check, X, Circle } from 'lucide-react'
 
 interface ReportStatus {
   testId: string
@@ -57,6 +58,8 @@ export const ReportsView = () => {
   const [visibleCount, setVisibleCount] = useState<number>(20)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null)
 
   // Filter statuses based on search query
   const filteredStatuses = useMemo(() => {
@@ -218,6 +221,50 @@ export const ReportsView = () => {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteClick = (testId: string) => {
+    setReportToDelete(testId)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!reportToDelete) return
+
+    try {
+      // Stop polling for this report if it exists
+      const interval = pollingIntervalRef.current.get(reportToDelete)
+      if (interval) {
+        clearInterval(interval)
+        pollingIntervalRef.current.delete(reportToDelete)
+      }
+
+      await apiClient.deleteExecution(reportToDelete)
+      
+      // Remove from state
+      setStatuses(prev => prev.filter(s => s.testId !== reportToDelete))
+      setFullStatuses(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(reportToDelete)
+        return newMap
+      })
+
+      uiNotificationService.send('reports:delete:success', {
+        title: 'Report Deleted',
+        message: 'The report has been successfully deleted',
+        variant: 'success',
+      })
+
+      setDeleteConfirmOpen(false)
+      setReportToDelete(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete report'
+      uiNotificationService.send('reports:delete:error', {
+        title: 'Failed to Delete Report',
+        message,
+        variant: 'error',
+      })
     }
   }
 
@@ -439,35 +486,93 @@ export const ReportsView = () => {
                       {formatDuration(status.duration)}
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-muted rounded-full h-2">
-                          <div
-                            className={cn(
-                              "h-2 rounded-full transition-all",
-                              status.status === 'completed' && "bg-green-500",
-                              status.status === 'failed' && "bg-red-500",
-                              status.status === 'running' && "bg-blue-500",
-                              status.status === 'pending' && "bg-yellow-500"
+                      <div className="flex flex-col gap-2">
+                        {status.totalSteps !== undefined && status.totalSteps > 0 && (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: Math.min(status.totalSteps, 10) }, (_, index) => {
+                              const stepNumber = index + 1
+                              // If status is completed, all steps are completed
+                              const isCompleted = status.status === 'completed' 
+                                ? true 
+                                : status.currentStep ? stepNumber < status.currentStep : false
+                              const isCurrent = status.status === 'completed' 
+                                ? false 
+                                : status.currentStep === stepNumber
+                              const isFailed = status.status === 'failed' && status.currentStep === stepNumber
+                              const isPending = !isCompleted && !isCurrent
+                              
+                              return (
+                                <div key={stepNumber} className="flex items-center">
+                                  <div
+                                    className={cn(
+                                      "w-4 h-4 rounded-full flex items-center justify-center border transition-all",
+                                      isCompleted && "bg-green-500 border-green-600",
+                                      isCurrent && !isFailed && "bg-blue-500 border-blue-600 animate-pulse",
+                                      isFailed && "bg-red-500 border-red-600",
+                                      isPending && "bg-muted border-border"
+                                    )}
+                                    title={`Step ${stepNumber}${isCompleted ? ' (Completed)' : isCurrent ? ' (Current)' : isFailed ? ' (Failed)' : ' (Pending)'}`}
+                                  >
+                                    {isCompleted && <Check className="h-2.5 w-2.5 text-white" />}
+                                    {isFailed && <X className="h-2.5 w-2.5 text-white" />}
+                                  </div>
+                                  {index < Math.min(status.totalSteps, 10) - 1 && (
+                                    <div
+                                      className={cn(
+                                        "h-0.5 w-1 transition-colors",
+                                        isCompleted ? "bg-green-500" : "bg-muted"
+                                      )}
+                                    />
+                                  )}
+                                </div>
+                              )
+                            })}
+                            {status.totalSteps > 10 && (
+                              <span className="text-xs text-muted-foreground ml-1">+{status.totalSteps - 10}</span>
                             )}
-                            style={{ width: `${status.progress}%` }}
-                          />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-muted rounded-full h-2">
+                            <div
+                              className={cn(
+                                "h-2 rounded-full transition-all",
+                                status.status === 'completed' && "bg-green-500",
+                                status.status === 'failed' && "bg-red-500",
+                                status.status === 'running' && "bg-blue-500",
+                                status.status === 'pending' && "bg-yellow-500"
+                              )}
+                              style={{ width: `${status.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{status.progress}%</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{status.progress}%</span>
                       </div>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground font-mono">
                       {status.testId.substring(0, 12)}...
                     </td>
                     <td className="p-3">
-                      <Button
-                        onClick={() => navigate(`/reports/${status.testId}`)}
-                        variant="outline"
-                        size="sm"
-                        title="View full report details"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => navigate(`/reports/${status.testId}`)}
+                          variant="outline"
+                          size="sm"
+                          title="View full report details"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteClick(status.testId)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          title="Delete report"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -512,6 +617,15 @@ export const ReportsView = () => {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
+                        <Button
+                          onClick={() => handleDeleteClick(status.testId)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          title="Delete report"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                         <div className={cn(
                           "px-3 py-1 rounded-md border text-sm font-semibold uppercase",
                           getStatusColor(status.status)
@@ -554,12 +668,75 @@ export const ReportsView = () => {
 
                       {status.totalSteps !== undefined && (
                         <div>
-                          <h4 className="font-semibold text-sm mb-2">Progress:</h4>
-                          <div className="space-y-1">
+                          <h4 className="font-semibold text-sm mb-3">Progress:</h4>
+                          <div className="space-y-3">
                             <div className="flex items-center justify-between text-sm">
                               <span>Step {status.currentStep || 0} of {status.totalSteps}</span>
                               <span>{status.progress}%</span>
                             </div>
+                            
+                            {/* Step Progress Bar */}
+                            <div className="flex items-center gap-2 py-2 overflow-x-auto">
+                              {Array.from({ length: status.totalSteps }, (_, index) => {
+                                const stepNumber = index + 1
+                                // If status is completed, all steps are completed
+                                const isCompleted = status.status === 'completed' 
+                                  ? true 
+                                  : status.currentStep ? stepNumber < status.currentStep : false
+                                const isCurrent = status.status === 'completed' 
+                                  ? false 
+                                  : status.currentStep === stepNumber
+                                const isFailed = status.status === 'failed' && status.currentStep === stepNumber
+                                const isPending = !isCompleted && !isCurrent
+                                
+                                // Get step details if available
+                                const fullStatus = fullStatuses.get(status.testId)
+                                const stepData = fullStatus && (fullStatus.steps || fullStatus.results) 
+                                  ? ((fullStatus.steps || fullStatus.results || []) as ExecutionStep[])[index]
+                                  : null
+                                
+                                return (
+                                  <div key={stepNumber} className="flex items-center">
+                                    <div className="flex flex-col items-center min-w-[60px]">
+                                      <div
+                                        className={cn(
+                                          "relative w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all",
+                                          isCompleted && "bg-green-500 border-green-600 text-white",
+                                          isCurrent && !isFailed && "bg-blue-500 border-blue-600 text-white animate-pulse",
+                                          isFailed && "bg-red-500 border-red-600 text-white",
+                                          isPending && "bg-muted border-border text-muted-foreground"
+                                        )}
+                                      >
+                                        {isCompleted ? (
+                                          <Check className="h-5 w-5" />
+                                        ) : isFailed ? (
+                                          <X className="h-5 w-5" />
+                                        ) : isCurrent ? (
+                                          <Circle className="h-5 w-5 fill-current" />
+                                        ) : (
+                                          <span className="text-xs font-semibold">{stepNumber}</span>
+                                        )}
+                                      </div>
+                                      {stepData?.description && (
+                                        <span className="text-xs text-muted-foreground mt-1 text-center max-w-[60px] truncate" title={stepData.description}>
+                                          {stepData.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {index < status.totalSteps - 1 && (
+                                      <div
+                                        className={cn(
+                                          "h-0.5 w-8 transition-colors",
+                                          isCompleted ? "bg-green-500" : "bg-muted"
+                                        )}
+                                      />
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            
+                            {/* Percentage Progress Bar */}
                             <div className="w-full bg-muted rounded-full h-2">
                               <div
                                 className={cn(
@@ -737,6 +914,34 @@ export const ReportsView = () => {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Report</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this report? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false)
+                setReportToDelete(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

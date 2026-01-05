@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { apiClient } from '@/services/apiClient'
 import { uiNotificationService } from '@/services/uiNotificationService'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -27,12 +28,8 @@ import {
   CardContent as MuiCardContent, 
   CardHeader as MuiCardHeader,
   Typography,
-  Checkbox as MuiCheckbox,
-  FormControlLabel,
-  Popover,
   Box,
-  IconButton,
-  Button as MuiButton
+  IconButton
 } from '@mui/material'
 import { LineChart, PieChart, BarChart } from '@mui/x-charts'
 
@@ -114,14 +111,22 @@ export const DashboardsView = () => {
   const isDark = theme === 'dark'
   const [statuses, setStatuses] = useState<ReportStatus[]>([])
   const [loading, setLoading] = useState(true)
+  const [globalSelectedReports, setGlobalSelectedReports] = useState<Set<string>>(new Set())
+  const [globalSelectedScenarios, setGlobalSelectedScenarios] = useState<Set<string>>(new Set())
   const [selectedReportsDuration, setSelectedReportsDuration] = useState<Set<string>>(new Set())
+  const [selectedScenariosDuration, setSelectedScenariosDuration] = useState<Set<string>>(new Set())
   const [selectedReportsStatus, setSelectedReportsStatus] = useState<Set<string>>(new Set())
+  const [selectedScenariosStatus, setSelectedScenariosStatus] = useState<Set<string>>(new Set())
   const [selectedReportsKpi, setSelectedReportsKpi] = useState<Set<string>>(new Set())
+  const [selectedScenariosKpi, setSelectedScenariosKpi] = useState<Set<string>>(new Set())
   const [selectedReportsSuccessRate, setSelectedReportsSuccessRate] = useState<Set<string>>(new Set())
+  const [selectedScenariosSuccessRate, setSelectedScenariosSuccessRate] = useState<Set<string>>(new Set())
   const [selectedReportsAvgDuration, setSelectedReportsAvgDuration] = useState<Set<string>>(new Set())
+  const [selectedScenariosAvgDuration, setSelectedScenariosAvgDuration] = useState<Set<string>>(new Set())
   const [selectedReportsExecutionStats, setSelectedReportsExecutionStats] = useState<Set<string>>(new Set())
-  const [openFilter, setOpenFilter] = useState<'kpi' | 'duration' | 'status' | 'successRate' | 'avgDuration' | 'executionStats' | null>(null)
-  const [filterAnchorEl, setFilterAnchorEl] = useState<{ [key: string]: HTMLButtonElement | null }>({})
+  const [selectedScenariosExecutionStats, setSelectedScenariosExecutionStats] = useState<Set<string>>(new Set())
+  const [openWidgetFilter, setOpenWidgetFilter] = useState<'kpi' | 'duration' | 'status' | 'successRate' | 'avgDuration' | 'executionStats' | null>(null)
+  const [isGlobalFiltersOpen, setIsGlobalFiltersOpen] = useState(false)
   const [widgetOrder, setWidgetOrder] = useState<string[]>(() => {
     // Load from localStorage on init
     const saved = localStorage.getItem('cuala_dashboard_widget_order')
@@ -241,30 +246,56 @@ export const DashboardsView = () => {
     }
   }
 
+  // Get unique scenarios from statuses
+  const uniqueScenarios = useMemo(() => {
+    const scenarioSet = new Set<string>()
+    statuses.forEach(s => {
+      if (s.scenario) {
+        scenarioSet.add(s.scenario)
+      }
+    })
+    return Array.from(scenarioSet).sort()
+  }, [statuses])
+
   useEffect(() => {
-    // Select all reports by default for all widgets
-    if (statuses.length > 0) {
-      if (selectedReportsDuration.size === 0) {
-        setSelectedReportsDuration(new Set(statuses.map(s => s.testId)))
-      }
-      if (selectedReportsStatus.size === 0) {
-        setSelectedReportsStatus(new Set(statuses.map(s => s.testId)))
-      }
-      if (selectedReportsKpi.size === 0) {
-        setSelectedReportsKpi(new Set(statuses.map(s => s.testId)))
-      }
-      if (selectedReportsSuccessRate.size === 0) {
-        setSelectedReportsSuccessRate(new Set(statuses.map(s => s.testId)))
-      }
-      if (selectedReportsAvgDuration.size === 0) {
-        setSelectedReportsAvgDuration(new Set(statuses.map(s => s.testId)))
-      }
-      if (selectedReportsExecutionStats.size === 0) {
-        setSelectedReportsExecutionStats(new Set(statuses.map(s => s.testId)))
-      }
+    // Select all reports and scenarios by default for global filter
+    if (statuses.length > 0 && globalSelectedReports.size === 0) {
+      const allTestIds = new Set(statuses.map(s => s.testId))
+      const allScenarios = new Set(uniqueScenarios)
+      setGlobalSelectedReports(allTestIds)
+      setGlobalSelectedScenarios(allScenarios)
+      // Also set all individual widget filters to match
+      setSelectedReportsDuration(allTestIds)
+      setSelectedScenariosDuration(allScenarios)
+      setSelectedReportsStatus(allTestIds)
+      setSelectedScenariosStatus(allScenarios)
+      setSelectedReportsKpi(allTestIds)
+      setSelectedScenariosKpi(allScenarios)
+      setSelectedReportsSuccessRate(allTestIds)
+      setSelectedScenariosSuccessRate(allScenarios)
+      setSelectedReportsAvgDuration(allTestIds)
+      setSelectedScenariosAvgDuration(allScenarios)
+      setSelectedReportsExecutionStats(allTestIds)
+      setSelectedScenariosExecutionStats(allScenarios)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statuses])
+  }, [statuses, uniqueScenarios])
+
+  // Sync all widget filters when global filter changes
+  useEffect(() => {
+    setSelectedReportsDuration(globalSelectedReports)
+    setSelectedScenariosDuration(globalSelectedScenarios)
+    setSelectedReportsStatus(globalSelectedReports)
+    setSelectedScenariosStatus(globalSelectedScenarios)
+    setSelectedReportsKpi(globalSelectedReports)
+    setSelectedScenariosKpi(globalSelectedScenarios)
+    setSelectedReportsSuccessRate(globalSelectedReports)
+    setSelectedScenariosSuccessRate(globalSelectedScenarios)
+    setSelectedReportsAvgDuration(globalSelectedReports)
+    setSelectedScenariosAvgDuration(globalSelectedScenarios)
+    setSelectedReportsExecutionStats(globalSelectedReports)
+    setSelectedScenariosExecutionStats(globalSelectedScenarios)
+  }, [globalSelectedReports, globalSelectedScenarios])
 
 
   const loadReports = async () => {
@@ -323,6 +354,18 @@ export const DashboardsView = () => {
     }
   }
 
+  const toggleGlobalReport = (testId: string) => {
+    setGlobalSelectedReports(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(testId)) {
+        newSet.delete(testId)
+      } else {
+        newSet.add(testId)
+      }
+      return newSet
+    })
+  }
+
   const selectAllReports = (widgetId: string) => {
     const setters: { [key: string]: React.Dispatch<React.SetStateAction<Set<string>>> } = {
       'kpi': setSelectedReportsKpi,
@@ -353,6 +396,87 @@ export const DashboardsView = () => {
     }
   }
 
+  const selectAllGlobalReports = () => {
+    setGlobalSelectedReports(new Set(statuses.map(s => s.testId)))
+  }
+
+  const deselectAllGlobalReports = () => {
+    setGlobalSelectedReports(new Set())
+  }
+
+  const toggleGlobalScenario = (scenario: string) => {
+    setGlobalSelectedScenarios(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(scenario)) {
+        newSet.delete(scenario)
+      } else {
+        newSet.add(scenario)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllGlobalScenarios = () => {
+    setGlobalSelectedScenarios(new Set(uniqueScenarios))
+  }
+
+  const deselectAllGlobalScenarios = () => {
+    setGlobalSelectedScenarios(new Set())
+  }
+
+  const toggleScenario = (scenario: string, widgetId: string) => {
+    const setters: { [key: string]: React.Dispatch<React.SetStateAction<Set<string>>> } = {
+      'kpi': setSelectedScenariosKpi,
+      'duration': setSelectedScenariosDuration,
+      'status': setSelectedScenariosStatus,
+      'successRate': setSelectedScenariosSuccessRate,
+      'avgDuration': setSelectedScenariosAvgDuration,
+      'executionStats': setSelectedScenariosExecutionStats,
+    }
+    const setter = setters[widgetId]
+    if (setter) {
+      setter(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(scenario)) {
+          newSet.delete(scenario)
+        } else {
+          newSet.add(scenario)
+        }
+        return newSet
+      })
+    }
+  }
+
+  const selectAllScenarios = (widgetId: string) => {
+    const setters: { [key: string]: React.Dispatch<React.SetStateAction<Set<string>>> } = {
+      'kpi': setSelectedScenariosKpi,
+      'duration': setSelectedScenariosDuration,
+      'status': setSelectedScenariosStatus,
+      'successRate': setSelectedScenariosSuccessRate,
+      'avgDuration': setSelectedScenariosAvgDuration,
+      'executionStats': setSelectedScenariosExecutionStats,
+    }
+    const setter = setters[widgetId]
+    if (setter) {
+      setter(new Set(uniqueScenarios))
+    }
+  }
+
+  const deselectAllScenarios = (widgetId: string) => {
+    const setters: { [key: string]: React.Dispatch<React.SetStateAction<Set<string>>> } = {
+      'kpi': setSelectedScenariosKpi,
+      'duration': setSelectedScenariosDuration,
+      'status': setSelectedScenariosStatus,
+      'successRate': setSelectedScenariosSuccessRate,
+      'avgDuration': setSelectedScenariosAvgDuration,
+      'executionStats': setSelectedScenariosExecutionStats,
+    }
+    const setter = setters[widgetId]
+    if (setter) {
+      setter(new Set())
+    }
+  }
+
   const getSelectedReports = (widgetId: string): Set<string> => {
     const maps: { [key: string]: Set<string> } = {
       'kpi': selectedReportsKpi,
@@ -365,117 +489,67 @@ export const DashboardsView = () => {
     return maps[widgetId] || new Set()
   }
 
-  const filteredStatusesDuration = statuses.filter(s => selectedReportsDuration.has(s.testId))
-  const filteredStatusesStatus = statuses.filter(s => selectedReportsStatus.has(s.testId))
-  const filteredStatusesKpi = statuses.filter(s => selectedReportsKpi.has(s.testId))
-  const filteredStatusesSuccessRate = statuses.filter(s => selectedReportsSuccessRate.has(s.testId))
-  const filteredStatusesAvgDuration = statuses.filter(s => selectedReportsAvgDuration.has(s.testId))
-  const filteredStatusesExecutionStats = statuses.filter(s => selectedReportsExecutionStats.has(s.testId))
+  const getSelectedScenarios = (widgetId: string): Set<string> => {
+    const maps: { [key: string]: Set<string> } = {
+      'kpi': selectedScenariosKpi,
+      'duration': selectedScenariosDuration,
+      'status': selectedScenariosStatus,
+      'successRate': selectedScenariosSuccessRate,
+      'avgDuration': selectedScenariosAvgDuration,
+      'executionStats': selectedScenariosExecutionStats,
+    }
+    return maps[widgetId] || new Set()
+  }
 
-  // Helper function to render filter popover
-  const renderFilterPopover = (widgetId: string) => {
-    const selectedReports = getSelectedReports(widgetId)
-    const anchorEl = filterAnchorEl[widgetId]
-    const isOpen = openFilter === widgetId
+  // Filter by both reports AND scenarios (AND logic)
+  // If no scenarios are selected, show all reports that match the report filter
+  // If scenarios are selected, only show reports that match both filters
+  // When a scenario is deselected, reports with that scenario are hidden
+  const filteredStatusesDuration = statuses.filter(s => {
+    const matchesReport = selectedReportsDuration.has(s.testId)
+    // If no scenarios are selected, show all (scenario filter is ignored)
+    // If scenarios are selected, only show reports whose scenario is in the selected set
+    const matchesScenario = selectedScenariosDuration.size === 0 || (s.scenario && selectedScenariosDuration.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
+  const filteredStatusesStatus = statuses.filter(s => {
+    const matchesReport = selectedReportsStatus.has(s.testId)
+    const matchesScenario = selectedScenariosStatus.size === 0 || (s.scenario && selectedScenariosStatus.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
+  const filteredStatusesKpi = statuses.filter(s => {
+    const matchesReport = selectedReportsKpi.has(s.testId)
+    const matchesScenario = selectedScenariosKpi.size === 0 || (s.scenario && selectedScenariosKpi.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
+  const filteredStatusesSuccessRate = statuses.filter(s => {
+    const matchesReport = selectedReportsSuccessRate.has(s.testId)
+    const matchesScenario = selectedScenariosSuccessRate.size === 0 || (s.scenario && selectedScenariosSuccessRate.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
+  const filteredStatusesAvgDuration = statuses.filter(s => {
+    const matchesReport = selectedReportsAvgDuration.has(s.testId)
+    const matchesScenario = selectedScenariosAvgDuration.size === 0 || (s.scenario && selectedScenariosAvgDuration.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
+  const filteredStatusesExecutionStats = statuses.filter(s => {
+    const matchesReport = selectedReportsExecutionStats.has(s.testId)
+    const matchesScenario = selectedScenariosExecutionStats.size === 0 || (s.scenario && selectedScenariosExecutionStats.has(s.scenario))
+    return matchesReport && matchesScenario
+  })
 
+  // Helper function to render filter button
+  const renderFilterButton = (widgetId: string) => {
     return (
-      <>
-        <IconButton
-          onClick={(e) => {
-            if (isOpen) {
-              setOpenFilter(null)
-              setFilterAnchorEl(prev => ({ ...prev, [widgetId]: null }))
-            } else {
-              setOpenFilter(widgetId as 'kpi' | 'duration' | 'status' | 'successRate' | 'avgDuration' | 'executionStats')
-              setFilterAnchorEl(prev => ({ ...prev, [widgetId]: e.currentTarget }))
-            }
-          }}
-          size="small"
-          title="Filter reports"
-          sx={{ ml: 1 }}
-        >
-          <Filter className="h-4 w-4" />
-        </IconButton>
-        <Popover
-          open={isOpen}
-          anchorEl={anchorEl}
-          onClose={() => {
-            setOpenFilter(null)
-            setFilterAnchorEl(prev => ({ ...prev, [widgetId]: null }))
-          }}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'right',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'right',
-          }}
-          PaperProps={{
-            sx: {
-              backgroundColor: isDark ? 'hsl(222.2, 84%, 4.9%)' : '#ffffff',
-              color: isDark ? 'hsl(210, 40%, 98%)' : 'hsl(222.2, 84%, 4.9%)',
-              border: isDark ? '1px solid hsl(217.2, 32.6%, 17.5%)' : '1px solid hsl(214.3, 31.8%, 91.4%)',
-            },
-          }}
-        >
-          <Box 
-            sx={{ 
-              p: 2, 
-              minWidth: 256, 
-              maxHeight: 400, 
-              overflow: 'auto',
-              msOverflowStyle: 'none',
-              scrollbarWidth: 'none',
-              '&::-webkit-scrollbar': {
-                display: 'none',
-              },
-            }} 
-            className="scrollbar-hide"
-          >
-            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold', color: isDark ? 'rgba(255, 255, 255, 0.9)' : undefined }}>
-              Filter Reports:
-            </Typography>
-            <Box display="flex" gap={1} mb={2}>
-              <MuiButton
-                onClick={() => selectAllReports(widgetId)}
-                variant="outlined"
-                size="small"
-                sx={{ flex: 1, fontSize: '0.75rem' }}
-              >
-                Select All
-              </MuiButton>
-              <MuiButton
-                onClick={() => deselectAllReports(widgetId)}
-                variant="outlined"
-                size="small"
-                sx={{ flex: 1, fontSize: '0.75rem' }}
-              >
-                Deselect All
-              </MuiButton>
-            </Box>
-            <Box>
-              {statuses.map((status) => (
-                <FormControlLabel
-                  key={status.testId}
-                  control={
-                    <MuiCheckbox
-                      checked={selectedReports.has(status.testId)}
-                      onChange={() => toggleReport(status.testId, widgetId)}
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Typography variant="body2" sx={{ color: isDark ? 'rgba(255, 255, 255, 0.9)' : undefined }}>
-                      {status.planName || status.scenario.substring(0, 40) || 'Unnamed Plan'}
-                    </Typography>
-                  }
-                />
-              ))}
-            </Box>
-          </Box>
-        </Popover>
-      </>
+      <Button
+        onClick={() => setOpenWidgetFilter(widgetId as 'kpi' | 'duration' | 'status' | 'successRate' | 'avgDuration' | 'executionStats')}
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0 ml-2"
+        title="Filter reports"
+      >
+        <Filter className="h-4 w-4" />
+      </Button>
     )
   }
 
@@ -642,7 +716,16 @@ export const DashboardsView = () => {
           <div className="flex items-center justify-between">
             <CardTitle>Analytics</CardTitle>
             <div className="flex gap-2">
-              <Button onClick={loadReports} variant="outline" size="sm">
+              <Button
+                onClick={() => setIsGlobalFiltersOpen(true)}
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                title="Open filters"
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+              <Button onClick={loadReports} variant="outline" size="sm" className="h-8">
                 Refresh
               </Button>
             </div>
@@ -686,7 +769,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">KPI Cards</Typography>
-                                    {renderFilterPopover('kpi')}
+                                    {renderFilterButton('kpi')}
                                   </Box>
                                 }
                               />
@@ -717,7 +800,7 @@ export const DashboardsView = () => {
                                   </MuiCard>
                                   <MuiCard sx={nestedCardStyles}>
                                     <MuiCardContent sx={{ p: 2 }}>
-                                      <Typography variant="body2" sx={{ color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined }} gutterBottom>
+                                      <Typography variant="body2" sx={{ color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined, whiteSpace: 'nowrap' }} gutterBottom>
                                         Active Reports
                                       </Typography>
                                       <Typography variant="h4" component="div" color="info.main">
@@ -758,7 +841,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">Duration Comparison</Typography>
-                                    {renderFilterPopover('duration')}
+                                    {renderFilterButton('duration')}
                                   </Box>
                                 }
                               />
@@ -812,7 +895,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">Status Comparison</Typography>
-                                    {renderFilterPopover('status')}
+                                    {renderFilterButton('status')}
                                   </Box>
                                 }
                               />
@@ -898,7 +981,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">Success Rate Over Time</Typography>
-                                    {renderFilterPopover('successRate')}
+                                    {renderFilterButton('successRate')}
                                   </Box>
                                 }
                               />
@@ -953,7 +1036,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">Average Duration by Plan</Typography>
-                                    {renderFilterPopover('avgDuration')}
+                                    {renderFilterButton('avgDuration')}
                                   </Box>
                                 }
                               />
@@ -1007,7 +1090,7 @@ export const DashboardsView = () => {
                                 title={
                                   <Box display="flex" alignItems="center">
                                     <Typography variant="h6">Execution Statistics</Typography>
-                                    {renderFilterPopover('executionStats')}
+                                    {renderFilterButton('executionStats')}
                                   </Box>
                                 }
                               />
@@ -1065,6 +1148,240 @@ export const DashboardsView = () => {
           )}
         </CardContent>
       </Card>
+      
+      <Dialog open={isGlobalFiltersOpen} onOpenChange={setIsGlobalFiltersOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+            <DialogDescription>
+              Select reports and scenarios to include in all analytics widgets
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Reports</h4>
+              <div className="space-y-2 max-h-[30vh] overflow-y-auto border rounded-md p-3">
+                <div className="flex items-center space-x-2 pb-2 border-b">
+                  <input
+                    type="checkbox"
+                    id="global-select-all-reports"
+                    checked={statuses.length > 0 && globalSelectedReports.size === statuses.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        selectAllGlobalReports()
+                      } else {
+                        deselectAllGlobalReports()
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <label
+                    htmlFor="global-select-all-reports"
+                    className="text-sm font-semibold flex-1 cursor-pointer"
+                  >
+                    Select All
+                  </label>
+                </div>
+                {statuses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No reports available</p>
+                ) : (
+                  statuses.map((status) => (
+                    <div key={status.testId} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`global-${status.testId}`}
+                        checked={globalSelectedReports.has(status.testId)}
+                        onChange={() => toggleGlobalReport(status.testId)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <label
+                        htmlFor={`global-${status.testId}`}
+                        className="text-sm flex-1 cursor-pointer"
+                      >
+                        {status.planName || status.scenario.substring(0, 50) || 'Unnamed Plan'}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Scenarios</h4>
+              <div className="space-y-2 max-h-[30vh] overflow-y-auto border rounded-md p-3">
+                <div className="flex items-center space-x-2 pb-2 border-b">
+                  <input
+                    type="checkbox"
+                    id="global-select-all-scenarios"
+                    checked={uniqueScenarios.length > 0 && globalSelectedScenarios.size === uniqueScenarios.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        selectAllGlobalScenarios()
+                      } else {
+                        deselectAllGlobalScenarios()
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <label
+                    htmlFor="global-select-all-scenarios"
+                    className="text-sm font-semibold flex-1 cursor-pointer"
+                  >
+                    Select All
+                  </label>
+                </div>
+                {uniqueScenarios.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No scenarios available</p>
+                ) : (
+                  uniqueScenarios.map((scenario) => (
+                    <div key={scenario} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`global-scenario-${scenario}`}
+                        checked={globalSelectedScenarios.has(scenario)}
+                        onChange={() => toggleGlobalScenario(scenario)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <label
+                        htmlFor={`global-scenario-${scenario}`}
+                        className="text-sm flex-1 cursor-pointer"
+                      >
+                        {scenario}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {openWidgetFilter && (
+        <Dialog open={!!openWidgetFilter} onOpenChange={(open) => !open && setOpenWidgetFilter(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Filters</DialogTitle>
+              <DialogDescription>
+                Select reports and scenarios to include in this widget's analytics
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Reports</h4>
+                <div className="space-y-2 max-h-[30vh] overflow-y-auto border rounded-md p-3">
+                  {(() => {
+                    const selectedReports = getSelectedReports(openWidgetFilter)
+                    const allSelected = statuses.length > 0 && selectedReports.size === statuses.length
+                    return (
+                      <div className="flex items-center space-x-2 pb-2 border-b">
+                        <input
+                          type="checkbox"
+                          id={`${openWidgetFilter}-select-all-reports`}
+                          checked={allSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              selectAllReports(openWidgetFilter)
+                            } else {
+                              deselectAllReports(openWidgetFilter)
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label
+                          htmlFor={`${openWidgetFilter}-select-all-reports`}
+                          className="text-sm font-semibold flex-1 cursor-pointer"
+                        >
+                          Select All
+                        </label>
+                      </div>
+                    )
+                  })()}
+                  {statuses.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No reports available</p>
+                  ) : (
+                    statuses.map((status) => {
+                      const selectedReports = getSelectedReports(openWidgetFilter)
+                      return (
+                        <div key={status.testId} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`${openWidgetFilter}-${status.testId}`}
+                            checked={selectedReports.has(status.testId)}
+                            onChange={() => toggleReport(status.testId, openWidgetFilter)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <label
+                            htmlFor={`${openWidgetFilter}-${status.testId}`}
+                            className="text-sm flex-1 cursor-pointer"
+                          >
+                            {status.planName || status.scenario.substring(0, 50) || 'Unnamed Plan'}
+                          </label>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Scenarios</h4>
+                <div className="space-y-2 max-h-[30vh] overflow-y-auto border rounded-md p-3">
+                  {(() => {
+                    const selectedScenarios = getSelectedScenarios(openWidgetFilter)
+                    const allScenariosSelected = uniqueScenarios.length > 0 && selectedScenarios.size === uniqueScenarios.length
+                    return (
+                      <div className="flex items-center space-x-2 pb-2 border-b">
+                        <input
+                          type="checkbox"
+                          id={`${openWidgetFilter}-select-all-scenarios`}
+                          checked={allScenariosSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              selectAllScenarios(openWidgetFilter)
+                            } else {
+                              deselectAllScenarios(openWidgetFilter)
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label
+                          htmlFor={`${openWidgetFilter}-select-all-scenarios`}
+                          className="text-sm font-semibold flex-1 cursor-pointer"
+                        >
+                          Select All
+                        </label>
+                      </div>
+                    )
+                  })()}
+                  {uniqueScenarios.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No scenarios available</p>
+                  ) : (
+                    uniqueScenarios.map((scenario) => {
+                      const selectedScenarios = getSelectedScenarios(openWidgetFilter)
+                      return (
+                        <div key={scenario} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`${openWidgetFilter}-scenario-${scenario}`}
+                            checked={selectedScenarios.has(scenario)}
+                            onChange={() => toggleScenario(scenario, openWidgetFilter)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <label
+                            htmlFor={`${openWidgetFilter}-scenario-${scenario}`}
+                            className="text-sm flex-1 cursor-pointer"
+                          >
+                            {scenario}
+                          </label>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

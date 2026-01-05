@@ -3,7 +3,9 @@
  * Handles all communication with the CUALA backend API
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = import.meta.env.DEV_MODE === 'false' 
+  ? (import.meta.env.SERVER || 'http://localhost:3001')
+  : 'http://localhost:3001'
 
 export interface ExecuteRequest {
   scenario?: string
@@ -292,6 +294,22 @@ class APIClient {
    */
   async deleteAllPlans(): Promise<{ success: boolean; deletedCount: number; message: string }> {
     const response = await fetch(`${this.baseUrl}/api/plans`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(error.message || error.error || `Request failed: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Delete an execution/report by testId
+   */
+  async deleteExecution(testId: string): Promise<{ success: boolean; testId: string; message: string }> {
+    const response = await fetch(`${this.baseUrl}/api/executions/${testId}`, {
       method: 'DELETE',
     })
 
