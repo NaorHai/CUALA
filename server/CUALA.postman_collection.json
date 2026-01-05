@@ -497,6 +497,96 @@
 			"description": "Async execution endpoints for long-running tests. The unified executor automatically chooses DOM or Vision for each step."
 		},
 		{
+			"name": "Configuration",
+			"item": [
+				{
+					"name": "Get All Confidence Thresholds",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/confidence-thresholds",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "confidence-thresholds"]
+						},
+						"description": "Get all confidence thresholds for element discovery. Returns both configured values and defaults. Confidence thresholds (0.0 to 1.0) control the minimum confidence level required for element discovery to accept a found element.\n\n**Response Fields:**\n- `thresholds` (array): Array of threshold objects with `actionType` and `threshold`\n- `total` (number): Total number of thresholds returned"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Confidence Threshold by Action Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "confidence-thresholds", "click"]
+						},
+						"description": "Get confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The confidence threshold value (0.0 to 1.0)\n- `isDefault` (boolean): `true` if using default value, `false` if configured\n- `config` (object): Configuration metadata if configured"
+					},
+					"response": []
+				},
+				{
+					"name": "Set Confidence Threshold",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"threshold\": 0.6,\n  \"description\": \"Custom threshold for click actions\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "confidence-thresholds", "click"]
+						},
+						"description": "Create or update confidence threshold for a specific action type. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Request Body:**\n- `threshold` (number, required): Confidence threshold value between 0.0 and 1.0\n- `description` (string, optional): Description of the threshold configuration\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The set threshold value\n- `configKey` (string): The configuration key used\n- `message` (string): Success message"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Confidence Threshold",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/confidence-thresholds/click",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "confidence-thresholds", "click"]
+						},
+						"description": "Delete a confidence threshold configuration, reverting it to the default value from .env file. Valid action types: `click`, `type`, `hover`, `verify`, `default`.\n\n**Response Fields:**\n- `actionType` (string): The action type\n- `threshold` (number): The default threshold value after deletion\n- `message` (string): Confirmation message"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete All Confidence Thresholds",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/confidence-thresholds",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "confidence-thresholds"]
+						},
+						"description": "Delete all confidence threshold configurations, reverting all to default values from .env file. Use with caution!\n\n**Response Fields:**\n- `message` (string): Confirmation message\n- `defaults` (object): Object containing all default threshold values"
+					},
+					"response": []
+				}
+			],
+			"description": "Configuration endpoints for managing confidence thresholds that control element discovery accuracy. Thresholds can be configured per action type (click, type, hover, verify) or as a default. Lower thresholds allow more lenient element matching, while higher thresholds require more confident matches."
+		},
+		{
 			"name": "Examples",
 			"item": [
 				{
