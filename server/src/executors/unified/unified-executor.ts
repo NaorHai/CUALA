@@ -7,6 +7,7 @@ import { IConfig } from '../../infra/config.js';
 import { PromptManager } from '../../infra/prompt-manager.js';
 import { SmartElementLocator } from '../../element-discovery/smart-element-locator.js';
 import { IElementDiscoveryService } from '../../element-discovery/index.js';
+import { ConfidenceThresholdService } from '../../infra/confidence-threshold-service.js';
 import {
   ACTIONS,
   VERIFICATION_TARGETS,
@@ -36,7 +37,8 @@ export class UnifiedExecutor implements IExecutor {
   constructor(
     private config: IConfig,
     private logger: ILogger,
-    elementDiscovery: IElementDiscoveryService
+    elementDiscovery: IElementDiscoveryService,
+    private confidenceThresholdService: ConfidenceThresholdService
   ) {
     const apiKey = config.get('OPENAI_API_KEY');
     if (!apiKey) {
@@ -45,7 +47,7 @@ export class UnifiedExecutor implements IExecutor {
     this.client = new OpenAI({ apiKey });
     this.model = config.get('OPENAI_VISION_MODEL') || 'gpt-4o';
     this.promptManager = PromptManager.getInstance();
-    this.smartLocator = new SmartElementLocator(elementDiscovery, logger);
+    this.smartLocator = new SmartElementLocator(elementDiscovery, logger, confidenceThresholdService);
   }
 
   async initialize(): Promise<void> {
@@ -217,8 +219,11 @@ export class UnifiedExecutor implements IExecutor {
       let retryCount = 0;
       const maxRetries = 3;
       
-      // Lower confidence threshold for click actions (buttons can be found with lower confidence)
-      const clickMinConfidence = action.name === ACTIONS.CLICK ? 0.5 : 0.7;
+      // Get confidence threshold from configuration service
+      const actionType = action.name === ACTIONS.CLICK ? 'click' : 
+                         action.name === ACTIONS.TYPE ? 'type' : 
+                         action.name === ACTIONS.HOVER ? 'hover' : 'verify';
+      const clickMinConfidence = await this.confidenceThresholdService.getThreshold(actionType);
 
       // Retry logic for better element discovery
       while (retryCount < maxRetries && (!location.selector || location.method !== 'dom' || location.confidence < clickMinConfidence)) {

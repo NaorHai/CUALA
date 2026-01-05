@@ -6,6 +6,7 @@ import { AIVerifier } from './verifier/ai-verifier.js';
 import { StdoutReporter } from './reporter/stdout-reporter.js';
 import { EnvConfig } from './infra/config.js';
 import { WinstonLogger } from './infra/logger.js';
+import { ConfidenceThresholdService } from './infra/confidence-threshold-service.js';
 import { ITestScenario, IReportData, IExecutionPlan, PlanPhase } from './types/index.js';
 import { IStorage } from './storage/index.js';
 import { InMemoryStorage } from './storage/in-memory-storage.js';
@@ -158,8 +159,11 @@ export async function runScenario(
   // Wrap base planner with adaptive planner
   const planner = new AdaptivePlanner(basePlanner, elementDiscovery, config, logger);
   
+  // Initialize confidence threshold service
+  const confidenceThresholdService = new ConfidenceThresholdService(executionStorage, logger, config);
+  
   // Use unified executor (combines DOM and Vision automatically)
-  const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery);
+  const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery, confidenceThresholdService);
   
   const verifier = new AIVerifier(config, logger);
   const reporter = new StdoutReporter();
@@ -173,7 +177,8 @@ export async function runScenario(
     elementDiscovery,
     logger,
     executionStorage, // Pass storage for plan persistence
-    config
+    config,
+    confidenceThresholdService
   );
 
   const scenario: ITestScenario = {
@@ -293,8 +298,11 @@ export async function runScenarioAsync(
     // Wrap base planner with adaptive planner
     const planner = new AdaptivePlanner(basePlanner, elementDiscovery, config, logger);
     
+    // Initialize confidence threshold service
+    const confidenceThresholdService = new ConfidenceThresholdService(storage, logger, config);
+    
     // Use unified executor (combines DOM and Vision automatically)
-    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery);
+    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery, confidenceThresholdService);
     
     const verifier = new AIVerifier(config, logger);
     const reporter = new StdoutReporter();
@@ -308,7 +316,8 @@ export async function runScenarioAsync(
       elementDiscovery,
       logger,
       storage, // Pass storage for plan persistence
-      config
+      config,
+      confidenceThresholdService
     );
 
     const scenario: ITestScenario = {
@@ -429,7 +438,11 @@ export async function runPlan(
       logger
     );
     const planner = new AdaptivePlanner(basePlanner, elementDiscovery, config, logger);
-    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery);
+    
+    // Initialize confidence threshold service
+    const confidenceThresholdService = new ConfidenceThresholdService(executionStorage, logger, config);
+    
+    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery, confidenceThresholdService);
     const verifier = new AIVerifier(config, logger);
     const reporter = new StdoutReporter();
     
@@ -441,7 +454,8 @@ export async function runPlan(
       elementDiscovery,
       logger,
       executionStorage,
-      config
+      config,
+      confidenceThresholdService
     );
     
     // Ensure plan has phase set
@@ -525,7 +539,11 @@ export async function runPlanAsync(
       logger
     );
     const planner = new AdaptivePlanner(basePlanner, elementDiscovery, config, logger);
-    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery);
+    
+    // Initialize confidence threshold service
+    const confidenceThresholdService = new ConfidenceThresholdService(storage, logger, config);
+    
+    const unifiedExecutor = new UnifiedExecutor(config, logger, elementDiscovery, confidenceThresholdService);
     const verifier = new AIVerifier(config, logger);
     const reporter = new StdoutReporter();
     
@@ -537,7 +555,8 @@ export async function runPlanAsync(
       elementDiscovery,
       logger,
       storage,
-      config
+      config,
+      confidenceThresholdService
     );
     
     // Ensure plan has phase set

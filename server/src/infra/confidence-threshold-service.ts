@@ -1,5 +1,6 @@
 import { IStorage } from '../storage/index.js';
 import { ILogger } from './logger.js';
+import { IConfig } from './config.js';
 import { ActionType } from '../types/confidence-threshold.js';
 import { getConfidenceThresholdKey, extractActionTypeFromKey } from '../types/config.js';
 
@@ -8,18 +9,49 @@ import { getConfidenceThresholdKey, extractActionTypeFromKey } from '../types/co
  * Uses the unified configuration system
  */
 export class ConfidenceThresholdService {
-  private defaultThresholds: Map<ActionType, number> = new Map([
-    ['click', 0.5],
-    ['type', 0.7],
-    ['hover', 0.7],
-    ['verify', 0.7],
-    ['default', 0.6]
-  ]);
+  private defaultThresholds: Map<ActionType, number>;
 
   constructor(
     private storage: IStorage,
-    private logger: ILogger
-  ) {}
+    private logger: ILogger,
+    private config: IConfig
+  ) {
+    // Load defaults from .env, fallback to hard-coded values
+    this.defaultThresholds = new Map([
+      ['click', parseFloat(config.get('CONFIDENCE_THRESHOLD_CLICK') || '0.5')],
+      ['type', parseFloat(config.get('CONFIDENCE_THRESHOLD_TYPE') || '0.7')],
+      ['hover', parseFloat(config.get('CONFIDENCE_THRESHOLD_HOVER') || '0.7')],
+      ['verify', parseFloat(config.get('CONFIDENCE_THRESHOLD_VERIFY') || '0.7')],
+      ['default', parseFloat(config.get('CONFIDENCE_THRESHOLD_DEFAULT') || '0.6')]
+    ]);
+    
+    // Initialize storage with defaults if not already set (async, don't await)
+    this.initializeDefaults().catch(err => {
+      logger.warn('Failed to initialize default confidence thresholds', err);
+    });
+  }
+
+  /**
+   * Initialize default thresholds in storage if they don't exist
+   */
+  private async initializeDefaults(): Promise<void> {
+    for (const [actionType, threshold] of this.defaultThresholds.entries()) {
+      try {
+        const configKey = getConfidenceThresholdKey(actionType);
+        const existing = await this.storage.getConfiguration(configKey);
+        if (!existing) {
+          await this.storage.setConfiguration(
+            configKey, 
+            threshold, 
+            `Default threshold for ${actionType} actions (loaded from .env)`
+          );
+          this.logger.debug(`Initialized default confidence threshold for ${actionType}: ${threshold}`);
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to initialize default threshold for ${actionType}`, error);
+      }
+    }
+  }
 
   /**
    * Get confidence threshold for a specific action type

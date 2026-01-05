@@ -2535,7 +2535,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     console.log(`Storage initialized: ${storageType}`);
     
     // Initialize confidence threshold service
-    confidenceThresholdService = new ConfidenceThresholdService(storage, logger);
+    confidenceThresholdService = new ConfidenceThresholdService(storage, logger, config);
     logger.info('Confidence threshold service initialized');
     
     app.listen(port, () => {

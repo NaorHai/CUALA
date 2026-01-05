@@ -16,6 +16,7 @@ import { AdaptivePlanner } from '../planner/adaptive-planner.js';
 import { EXECUTION_STATUS } from '../constants/index.js';
 import { IStorage } from '../storage/index.js';
 import { IConfig } from '../infra/config.js';
+import { ConfidenceThresholdService } from '../infra/confidence-threshold-service.js';
 import { Page } from 'playwright';
 import { RefinementDecisionEngine } from './refinement-strategies/refinement-decision-engine.js';
 
@@ -38,7 +39,8 @@ export class AdaptiveExecutionOrchestrator extends ExecutionOrchestrator {
     private elementDiscovery: IElementDiscoveryService,
     logger: ILogger,
     storage?: IStorage,
-    config?: IConfig
+    config?: IConfig,
+    private confidenceThresholdService?: ConfidenceThresholdService
   ) {
     super(domExecutor, computerExecutor, verifier, logger);
     this.storage = storage;
@@ -815,11 +817,15 @@ export class AdaptiveExecutionOrchestrator extends ExecutionOrchestrator {
         }
       );
 
-      // Use confidence threshold from strategy
-      if (discovery.confidence < 0.5) {
+      // Use confidence threshold from configuration service
+      const defaultThreshold = this.confidenceThresholdService 
+        ? await this.confidenceThresholdService.getThreshold('default')
+        : 0.5; // Fallback to hard-coded value if service not available
+      if (discovery.confidence < defaultThreshold) {
         this.logger.warn(`Low confidence discovery for step ${step.id}`, { 
           testId: this.testId,
           confidence: discovery.confidence,
+          threshold: defaultThreshold,
           selector: discovery.selector
         });
         return false;

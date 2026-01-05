@@ -2,6 +2,7 @@ import { Page } from 'playwright';
 import { IElementDiscoveryService } from './index.js';
 import { IElementDiscoveryResult } from '../types/index.js';
 import { ILogger } from '../infra/logger.js';
+import { ConfidenceThresholdService } from '../infra/confidence-threshold-service.js';
 
 /**
  * Smart Element Locator
@@ -10,7 +11,8 @@ import { ILogger } from '../infra/logger.js';
 export class SmartElementLocator {
   constructor(
     private elementDiscovery: IElementDiscoveryService,
-    private logger: ILogger
+    private logger: ILogger,
+    private confidenceThresholdService: ConfidenceThresholdService
   ) {}
 
   /**
@@ -129,8 +131,8 @@ export class SmartElementLocator {
         }
       } else {
         // For non-TYPE actions (click, hover, verify), use discovery result
-        // Lower confidence threshold for buttons/submit buttons - they can be found with lower confidence
-        const minConfidence = actionType === 'click' ? 0.5 : 0.7; // Lower threshold for click actions
+        // Get confidence threshold from configuration service
+        const minConfidence = await this.confidenceThresholdService.getThreshold(actionType);
         
         if (discovery.confidence >= minConfidence) {
           const count = await page.locator(discovery.selector).count();
