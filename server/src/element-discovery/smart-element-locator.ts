@@ -251,35 +251,54 @@ export class SmartElementLocator {
         const actType = args.actType;
         
         function buildSelector(el: Element): string {
-          // Prefer data-testid
-          const testId = el.getAttribute('data-testid');
-          if (testId) {
-            return '[data-testid="' + testId + '"]';
+          const tagName = el.tagName.toLowerCase();
+          
+          // For links, prioritize href over data-testid (href is more unique)
+          if (tagName === 'a') {
+            const href = (el as HTMLElement).getAttribute('href');
+            if (href) {
+              return 'a[href="' + href + '"]';
+            }
+            // For links without href, prefer title or aria-label over data-testid
+            const title = el.getAttribute('title');
+            if (title) {
+              return 'a[title="' + title + '"]';
+            }
+            const ariaLabel = el.getAttribute('aria-label');
+            if (ariaLabel) {
+              return 'a[aria-label="' + ariaLabel + '"]';
+            }
           }
           
-          // Prefer ID
+          // Prefer ID (most unique)
           if (el.id) {
             return '#' + el.id;
           }
           
           // Use name for inputs
-          if (el.tagName.toLowerCase() === 'input') {
+          if (tagName === 'input') {
             const name = el.getAttribute('name');
             if (name) {
               return 'input[name="' + name + '"]';
             }
           }
           
-          // Use title for links/buttons
+          // Use title for buttons/other elements
           const title = el.getAttribute('title');
           if (title) {
-            return el.tagName.toLowerCase() + '[title="' + title + '"]';
+            return tagName + '[title="' + title + '"]';
           }
           
           // Use aria-label
           const ariaLabel = el.getAttribute('aria-label');
           if (ariaLabel) {
             return '[aria-label="' + ariaLabel + '"]';
+          }
+          
+          // Use data-testid as fallback (less reliable for links with shared testids)
+          const testId = el.getAttribute('data-testid');
+          if (testId) {
+            return '[data-testid="' + testId + '"]';
           }
           
           // Use class if specific enough
@@ -298,7 +317,7 @@ export class SmartElementLocator {
           }
           
           // Fallback to tag
-          return el.tagName.toLowerCase();
+          return tagName;
         }
         
         function calculateMatchScore(el: any, desc: string, actType: string): number {
@@ -331,13 +350,23 @@ export class SmartElementLocator {
               }
             }
             // Extract capitalized phrases
-            const capitalizedPhrases = desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:tab|link)\b/i) || 
+            const capitalizedPhrases = desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:tab|link|item)\b/i) || 
                                        desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g) || [];
             for (let i = 0; i < capitalizedPhrases.length; i++) {
               const phrase = capitalizedPhrases[i];
-              const cleaned = phrase.replace(/\s+(tab|link)$/i, '').trim();
-              if (cleaned.length > 3 && !texts.includes(cleaned) && cleaned.toLowerCase() !== 'tab' && cleaned.toLowerCase() !== 'link') {
+              const cleaned = phrase.replace(/\s+(tab|link|item)$/i, '').trim();
+              if (cleaned.length > 3 && !texts.includes(cleaned) && cleaned.toLowerCase() !== 'tab' && cleaned.toLowerCase() !== 'link' && cleaned.toLowerCase() !== 'item') {
                 texts.push(cleaned);
+              }
+            }
+            // Also extract single capitalized words (e.g., "Health" from "the Health top navigation item")
+            const singleCapitalizedWords = desc.match(/\b([A-Z][a-z]{2,})\b/g) || [];
+            for (let i = 0; i < singleCapitalizedWords.length; i++) {
+              const word = singleCapitalizedWords[i];
+              // Skip common words that aren't meaningful
+              const skipWords = ['The', 'Top', 'Navigation', 'Nav', 'Item', 'Link', 'Tab', 'Button'];
+              if (!skipWords.includes(word) && !texts.includes(word)) {
+                texts.push(word);
               }
             }
             return texts;
@@ -518,6 +547,7 @@ export class SmartElementLocator {
               const score = calculateMatchScore(el, desc, actType);
               
               if (score > 0) {
+                const href = (el as HTMLElement).getAttribute('href') || undefined;
                 scoredElements.push({
                   selector: buildSelector(el),
                   score: score,
@@ -528,7 +558,8 @@ export class SmartElementLocator {
                   id: el.id || undefined,
                   name: el.getAttribute('name') || undefined,
                   className: el.className || undefined,
-                  type: el.getAttribute('type') || undefined
+                  type: el.getAttribute('type') || undefined,
+                  href: href
                 });
               }
             }
@@ -555,16 +586,144 @@ export class SmartElementLocator {
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
         try {
-          const count = await page.locator(candidate.selector).count();
+          let count = await page.locator(candidate.selector).count();
+          let selectorToUse = candidate.selector;
+          
+          // If selector matches multiple elements, try to create a more specific selector
+          if (count > 1) {
+            // Extract key text from description (e.g., "Health" from "the Health top navigation item")
+            const extractKeyText = (desc: string): string | null => {
+              // Remove common words and extract meaningful capitalized words
+              const words = desc
+                .replace(/\b(the|a|an|top|navigation|nav|item|link|button|tab)\b/gi, '')
+                .trim()
+                .split(/\s+/)
+                .filter(w => w.length > 0 && /^[A-Z]/.test(w));
+              return words.length > 0 ? words[0] : null;
+            };
+            
+            const keyText = extractKeyText(description);
+            
+            // Try to create a more specific selector by combining with text content or href
+            const moreSpecificSelector = await page.evaluate(function(args: any) {
+              const baseSelector = args.selector;
+              const targetText = args.text;
+              const targetHref = args.href;
+              const keyText = args.keyText;
+              
+              try {
+                const elements = document.querySelectorAll(baseSelector);
+                if (elements.length === 0) return null;
+                
+                // Try to find the element that matches the description
+                for (let i = 0; i < elements.length; i++) {
+                  const el = elements[i];
+                  const textContent = (el.textContent || '').trim();
+                  const lowerText = textContent.toLowerCase();
+                  const href = (el as HTMLElement).getAttribute('href') || '';
+                  
+                  // Priority 1: Match by key text from description (e.g., "Health")
+                  if (keyText) {
+                    const lowerKeyText = keyText.toLowerCase();
+                    if (lowerText === lowerKeyText || lowerText.includes(lowerKeyText)) {
+                      // For links, prefer combining with href (case-insensitive)
+                      if (el.tagName.toLowerCase() === 'a' && href) {
+                        const lowerHref = href.toLowerCase();
+                        // Try to infer href from key text (e.g., "Health" -> "/health")
+                        const inferredHref = '/' + lowerKeyText.replace(/\s+/g, '-');
+                        // Use case-insensitive attribute selector (Playwright supports this)
+                        if (lowerHref === inferredHref || lowerHref.includes(inferredHref.substring(1))) {
+                          return baseSelector + '[href*="' + inferredHref.substring(1) + '" i]';
+                        }
+                        return baseSelector + '[href="' + href + '" i]';
+                      }
+                      // Fallback: use text content (will need Playwright text locator)
+                      // But for now, if href is available, use it
+                      if (href) {
+                        return baseSelector + '[href="' + href + '" i]';
+                      }
+                    }
+                  }
+                  
+                  // Priority 2: Match by candidate text
+                  if (targetText && lowerText.includes(targetText.toLowerCase())) {
+                    if (el.tagName.toLowerCase() === 'a' && href) {
+                      return baseSelector + '[href="' + href + '" i]';
+                    }
+                  }
+                  
+                  // Priority 3: Match by href (case-insensitive)
+                  if (targetHref && href.toLowerCase() === targetHref.toLowerCase()) {
+                    return baseSelector + '[href="' + href + '" i]';
+                  }
+                }
+                
+                return null;
+              } catch (e) {
+                return null;
+              }
+            }, {
+              selector: candidate.selector,
+              text: candidate.text,
+              href: candidate.href,
+              keyText: keyText
+            });
+            
+            if (moreSpecificSelector) {
+              count = await page.locator(moreSpecificSelector).count();
+              if (count === 1) {
+                selectorToUse = moreSpecificSelector;
+                this.logger.debug(`INTELLIGENT DOM SEARCH: Created more specific selector for multiple matches`, {
+                  testId,
+                  originalSelector: candidate.selector,
+                  specificSelector: moreSpecificSelector,
+                  keyText: keyText
+                });
+              } else {
+                // If still multiple matches, try using Playwright text locator
+                if (keyText && candidate.selector.includes('data-testid')) {
+                  try {
+                    const textSelector = `${candidate.selector} >> text="${keyText}"`;
+                    count = await page.locator(textSelector).count();
+                    if (count === 1) {
+                      selectorToUse = textSelector;
+                      this.logger.debug(`INTELLIGENT DOM SEARCH: Using text locator for disambiguation`, {
+                        testId,
+                        selector: textSelector
+                      });
+                    }
+                  } catch (e) {
+                    // Text locator failed, continue with original
+                  }
+                }
+              }
+            } else if (keyText && candidate.selector.includes('data-testid')) {
+              // Fallback: try Playwright text locator directly
+              try {
+                const textSelector = `${candidate.selector} >> text="${keyText}"`;
+                count = await page.locator(textSelector).count();
+                if (count === 1) {
+                  selectorToUse = textSelector;
+                  this.logger.debug(`INTELLIGENT DOM SEARCH: Using text locator for disambiguation (fallback)`, {
+                    testId,
+                    selector: textSelector
+                  });
+                }
+              } catch (e) {
+                // Text locator failed, continue with original
+              }
+            }
+          }
+          
           if (count === 1) {
-            const isVisible = await page.locator(candidate.selector).isVisible().catch(() => false);
+            const isVisible = await page.locator(selectorToUse).isVisible().catch(() => false);
             if (isVisible) {
               // Convert score (0-100+) to confidence (0-1)
               const confidence = Math.min(0.95, Math.max(0.5, candidate.score / 100));
               
               this.logger.info(`INTELLIGENT DOM SEARCH: Found element with score ${candidate.score}`, {
                 testId,
-                selector: candidate.selector,
+                selector: selectorToUse,
                 confidence,
                 tag: candidate.tag,
                 text: candidate.text,
@@ -573,7 +732,7 @@ export class SmartElementLocator {
               });
               
               return {
-                selector: candidate.selector,
+                selector: selectorToUse,
                 confidence: confidence
               };
             }
@@ -670,14 +829,24 @@ export class SmartElementLocator {
         }
       }
       // Extract capitalized phrases (e.g., "Data Model tab", "Data Lake Objects tab")
-      const capitalizedPhrases = desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:tab|link)\b/i) || 
+      const capitalizedPhrases = desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:tab|link|item)\b/i) || 
                                  desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g) || [];
       for (let i = 0; i < capitalizedPhrases.length; i++) {
         const phrase = capitalizedPhrases[i];
-        // Remove "tab" or "link" suffix if present
-        const cleaned = phrase.replace(/\s+(tab|link)$/i, '').trim();
-        if (cleaned.length > 3 && !texts.includes(cleaned) && cleaned.toLowerCase() !== 'tab' && cleaned.toLowerCase() !== 'link') {
+        // Remove "tab", "link", or "item" suffix if present
+        const cleaned = phrase.replace(/\s+(tab|link|item)$/i, '').trim();
+        if (cleaned.length > 3 && !texts.includes(cleaned) && cleaned.toLowerCase() !== 'tab' && cleaned.toLowerCase() !== 'link' && cleaned.toLowerCase() !== 'item') {
           texts.push(cleaned);
+        }
+      }
+      // Also extract single capitalized words (e.g., "Health" from "the Health top navigation item")
+      const singleCapitalizedWords = desc.match(/\b([A-Z][a-z]{2,})\b/g) || [];
+      for (let i = 0; i < singleCapitalizedWords.length; i++) {
+        const word = singleCapitalizedWords[i];
+        // Skip common words that aren't meaningful
+        const skipWords = ['The', 'Top', 'Navigation', 'Nav', 'Item', 'Link', 'Tab', 'Button'];
+        if (!skipWords.includes(word) && !texts.includes(word)) {
+          texts.push(word);
         }
       }
       return texts;
@@ -689,6 +858,38 @@ export class SmartElementLocator {
     if (tabTexts.length > 0) {
       for (let i = 0; i < tabTexts.length; i++) {
         const text = tabTexts[i];
+        
+        // For links, try to extract or infer href from description
+        // 1. Check if description mentions a URL path directly (e.g., "/health")
+        const hrefMatch = description.match(/\/([a-z0-9\-]+)/i);
+        if (hrefMatch) {
+          const hrefPath = hrefMatch[0].toLowerCase();
+          // Try exact match (case-insensitive via lowercase)
+          patterns.unshift(`a[href="${hrefPath}" i]`);
+          patterns.unshift(`a[href="${hrefPath}"]`);
+          // Try contains match (case-insensitive)
+          patterns.unshift(`a[href*="${hrefPath}" i]`);
+          patterns.unshift(`a[href*="${hrefPath}"]`);
+        }
+        
+        // 2. Convert text to potential href path (e.g., "Health" -> "/health")
+        const textToHref = (txt: string): string => {
+          // Convert to lowercase and handle common patterns
+          return '/' + txt.toLowerCase().replace(/\s+/g, '-');
+        };
+        const potentialHref = textToHref(text);
+        // Try exact match (case-insensitive)
+        patterns.unshift(`a[href="${potentialHref}" i]`);
+        patterns.unshift(`a[href="${potentialHref}"]`);
+        // Try contains match (case-insensitive)
+        patterns.unshift(`a[href*="${potentialHref}" i]`);
+        patterns.unshift(`a[href*="${potentialHref}"]`);
+        
+        // 3. Also try exact match with leading slash removed (some hrefs might be relative)
+        const hrefWithoutSlash = potentialHref.substring(1);
+        patterns.unshift(`a[href*="${hrefWithoutSlash}" i]`);
+        patterns.unshift(`a[href*="${hrefWithoutSlash}"]`);
+        
         // Tabs/links with title attribute (highest priority)
         patterns.unshift(`a[title="${text}"]`);
         patterns.unshift(`a[title*="${text}" i]`);
@@ -701,11 +902,11 @@ export class SmartElementLocator {
         // Elements with aria-label
         patterns.unshift(`[aria-label="${text}"]`);
         patterns.unshift(`[aria-label*="${text}" i]`);
-        // Links/tabs with text content
-        patterns.unshift(`a:has-text("${text}")`);
+        // Links/tabs with text content (Playwright text locators - highest priority for disambiguation)
         patterns.unshift(`a >> text="${text}"`);
-        patterns.unshift(`button:has-text("${text}")`);
+        patterns.unshift(`a:has-text("${text}")`);
         patterns.unshift(`button >> text="${text}"`);
+        patterns.unshift(`button:has-text("${text}")`);
         // Elements containing the text
         patterns.unshift(`:has-text("${text}")`);
       }

@@ -2495,7 +2495,7 @@ app.get('/api/list-plans', async (req, res) => {
         steps: plan.steps.map(step => ({
           id: step.id,
           description: step.description,
-          action: step.action.name,
+          action: step.action?.name || 'unknown',
           hasAssertion: !!step.assertion
         }))
       }))
