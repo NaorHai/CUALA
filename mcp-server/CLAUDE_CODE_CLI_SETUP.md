@@ -15,7 +15,7 @@ The CUALA MCP server has been added to your Claude Code CLI configuration.
     "cuala": {
       "command": "node",
       "args": [
-        "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+        "/path/to/CUALA/mcp-server/build/index.js"
       ],
       "env": {
         "CUALA_API_URL": "http://localhost:3001"
@@ -42,7 +42,7 @@ Before starting Claude Code again, make sure the CUALA API server is running:
 
 ```bash
 # Terminal 1: Start CUALA API
-cd /Users/nhaimov/Documents/Private/CUALA/server
+cd /path/to/CUALA/server
 npm run dev
 
 # Wait for: "CUALA API Server running at http://localhost:3001"
@@ -156,7 +156,7 @@ cat ~/Library/Application\ Support/Claude/claude_desktop_config.json | jq .mcpSe
 {
   "command": "node",
   "args": [
-    "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+    "/path/to/CUALA/mcp-server/build/index.js"
   ],
   "env": {
     "CUALA_API_URL": "http://localhost:3001"
@@ -178,7 +178,7 @@ curl http://localhost:3001/api/list-plans
 
 **If not responding:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/server
+cd /path/to/CUALA/server
 npm run dev
 ```
 
@@ -207,7 +207,7 @@ Should show the MCP server process running.
 
 **Run MCP Inspector:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 npx @modelcontextprotocol/inspector node build/index.js
 ```
 
@@ -318,9 +318,9 @@ Browser Automation (Playwright + AI)
 
 ## Files Reference
 
-- **MCP Server**: `/Users/nhaimov/Documents/Private/CUALA/mcp-server/`
-- **API Server**: `/Users/nhaimov/Documents/Private/CUALA/server/`
-- **UI**: `/Users/nhaimov/Documents/Private/CUALA/ui/`
+- **MCP Server**: `/path/to/CUALA/mcp-server/`
+- **API Server**: `/path/to/CUALA/server/`
+- **UI**: `/path/to/CUALA/ui/`
 - **Config**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Logs**: `~/.claude/debug/`
 
@@ -329,10 +329,10 @@ Browser Automation (Playwright + AI)
 **Start Everything:**
 ```bash
 # Terminal 1: CUALA API
-cd /Users/nhaimov/Documents/Private/CUALA/server && npm run dev
+cd /path/to/CUALA/server && npm run dev
 
 # Terminal 2: CUALA UI (optional)
-cd /Users/nhaimov/Documents/Private/CUALA/ui && npm run dev
+cd /path/to/CUALA/ui && npm run dev
 
 # Terminal 3: Claude Code
 claude
@@ -340,7 +340,7 @@ claude
 
 **Test Connection:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 ./test-connection.sh
 ```
 

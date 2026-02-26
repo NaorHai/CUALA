@@ -16,6 +16,14 @@ import type { ILLMProvider } from '../types.js';
 const logger = new WinstonLogger('error'); // Only log errors during tests
 const config = new EnvConfig();
 
+// Helper to check if API key is real (not a test/fake key)
+function isRealApiKey(key: string | undefined): boolean {
+  if (!key) return false;
+  // Skip fake keys used in CI
+  if (key.includes('test-key') || key.includes('not-real')) return false;
+  return true;
+}
+
 describe('LLM Provider Abstraction', () => {
   describe('OpenAI Provider', () => {
     let provider: OpenAIProvider;
@@ -59,8 +67,8 @@ describe('LLM Provider Abstraction', () => {
       expect(provider.getPlannerModel()).toBe('gpt-4o-mini');
     });
 
-    // Only run API tests if key is configured
-    if (config.get('OPENAI_API_KEY')) {
+    // Only run API tests if real key is configured
+    if (isRealApiKey(config.get('OPENAI_API_KEY'))) {
       it('should create simple completion', async () => {
         const response = await provider.createChatCompletion({
           model: 'gpt-4o-mini',
@@ -143,8 +151,8 @@ describe('LLM Provider Abstraction', () => {
       expect(provider.getPlannerModel()).toBe('claude-3-5-haiku-20241022');
     });
 
-    // Only run API tests if key is configured
-    if (config.get('ANTHROPIC_API_KEY')) {
+    // Only run API tests if real key is configured
+    if (isRealApiKey(config.get('ANTHROPIC_API_KEY'))) {
       it('should create simple completion', async () => {
         const response = await provider.createChatCompletion({
           model: 'claude-3-5-haiku-20241022',
@@ -192,8 +200,8 @@ describe('LLM Provider Abstraction', () => {
 
   describe('Provider Factory', () => {
     it('should create OpenAI provider from config', () => {
-      if (!config.get('OPENAI_API_KEY')) {
-        return; // Skip if no key
+      if (!isRealApiKey(config.get('OPENAI_API_KEY'))) {
+        return; // Skip if no real key
       }
 
       const provider = LLMProviderFactory.create('openai', config, logger);
@@ -202,8 +210,8 @@ describe('LLM Provider Abstraction', () => {
     });
 
     it('should create Anthropic provider from config', () => {
-      if (!config.get('ANTHROPIC_API_KEY')) {
-        return; // Skip if no key
+      if (!isRealApiKey(config.get('ANTHROPIC_API_KEY'))) {
+        return; // Skip if no real key
       }
 
       const provider = LLMProviderFactory.create('anthropic', config, logger);
@@ -220,8 +228,8 @@ describe('LLM Provider Abstraction', () => {
 
     it('should create provider based on LLM_PROVIDER env var', () => {
       // This will use whatever is configured in .env
-      if (!config.get('OPENAI_API_KEY') && !config.get('ANTHROPIC_API_KEY')) {
-        return; // Skip if no keys
+      if (!isRealApiKey(config.get('OPENAI_API_KEY')) && !isRealApiKey(config.get('ANTHROPIC_API_KEY'))) {
+        return; // Skip if no real keys
       }
 
       const provider = LLMProviderFactory.createFromConfig(config, logger);
@@ -234,7 +242,7 @@ describe('LLM Provider Abstraction', () => {
     const providers: ILLMProvider[] = [];
 
     beforeAll(() => {
-      if (config.get('OPENAI_API_KEY')) {
+      if (isRealApiKey(config.get('OPENAI_API_KEY'))) {
         providers.push(
           new OpenAIProvider(
             {
@@ -246,7 +254,7 @@ describe('LLM Provider Abstraction', () => {
         );
       }
 
-      if (config.get('ANTHROPIC_API_KEY')) {
+      if (isRealApiKey(config.get('ANTHROPIC_API_KEY'))) {
         providers.push(
           new AnthropicProvider(
             {

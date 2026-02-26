@@ -11,7 +11,7 @@ This guide walks you through integrating CUALA with Claude Desktop using the Mod
 ## Step 1: Build the MCP Server
 
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 npm install
 npm run build
 ```
@@ -52,7 +52,7 @@ Edit `claude_desktop_config.json` and add the CUALA MCP server:
     "cuala": {
       "command": "node",
       "args": [
-        "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+        "/path/to/CUALA/mcp-server/build/index.js"
       ],
       "env": {
         "CUALA_API_URL": "http://localhost:3001"
@@ -62,7 +62,7 @@ Edit `claude_desktop_config.json` and add the CUALA MCP server:
 }
 ```
 
-**⚠️ Important:** Replace `/Users/nhaimov/Documents/Private/CUALA` with your actual path if different.
+**⚠️ Important:** Replace `/path/to/CUALA` with your actual path if different.
 
 ### If You Have Existing MCP Servers
 
@@ -78,7 +78,7 @@ If you already have MCP servers configured, merge them:
     "cuala": {
       "command": "node",
       "args": [
-        "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+        "/path/to/CUALA/mcp-server/build/index.js"
       ],
       "env": {
         "CUALA_API_URL": "http://localhost:3001"
@@ -93,7 +93,7 @@ If you already have MCP servers configured, merge them:
 ### Terminal 1: CUALA API Server
 
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/server
+cd /path/to/CUALA/server
 npm run dev
 ```
 
@@ -102,7 +102,7 @@ Wait for: `CUALA API Server running at http://localhost:3001`
 ### Terminal 2: CUALA UI (Optional)
 
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/ui
+cd /path/to/CUALA/ui
 npm run dev
 ```
 
@@ -191,7 +191,7 @@ If syntax error, it will show line number.
 
 **Check build exists:**
 ```bash
-ls /Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js
+ls /path/to/CUALA/mcp-server/build/index.js
 ```
 
 **View Claude Desktop logs:**
@@ -218,7 +218,7 @@ Should show node process on port 3001.
 
 **Test with MCP Inspector:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 npx @modelcontextprotocol/inspector node build/index.js
 ```
 
@@ -239,7 +239,7 @@ curl http://localhost:3001/api/list-plans
 
 After any code changes, rebuild:
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 npm run build
 ```
 
@@ -335,7 +335,7 @@ The element discovery is too strict. Can you lower the confidence thresholds?
 To update the MCP server after code changes:
 
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 git pull  # if pulling updates
 npm install  # if dependencies changed
 npm run build

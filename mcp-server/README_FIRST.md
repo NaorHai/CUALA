@@ -15,7 +15,7 @@ exit
 
 ### 2. Start CUALA Services
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 ./quick-start.sh
 ```
 
@@ -115,7 +115,7 @@ Get GUS ticket W-12345 and generate CUALA tests from the acceptance criteria
 
 ### Test Connection
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 ./test-connection.sh
 ```
 
@@ -128,7 +128,7 @@ Expected output:
 
 ### Verify Configuration
 ```bash
-grep -A 8 '"cuala"' "/Users/nhaimov/Library/Application Support/Claude/claude_desktop_config.json"
+grep -A 8 '"cuala"' "~/Library/Application Support/Claude/claude_desktop_config.json"
 ```
 
 Should show:
@@ -136,7 +136,7 @@ Should show:
 "cuala": {
   "command": "node",
   "args": [
-    "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+    "/path/to/CUALA/mcp-server/build/index.js"
   ],
   "env": {
     "CUALA_API_URL": "http://localhost:3001"
@@ -243,7 +243,7 @@ claude
 
 **CUALA API not responding?**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/server
+cd /path/to/CUALA/server
 npm run dev
 ```
 

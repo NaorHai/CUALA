@@ -89,7 +89,7 @@ npm run build
        "cuala": {
          "command": "node",
          "args": [
-           "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+           "/path/to/CUALA/mcp-server/build/index.js"
          ],
          "env": {
            "CUALA_API_URL": "http://localhost:3001"

@@ -16,7 +16,7 @@ Your CUALA MCP server is now configured for **both Claude Desktop and Claude Cod
     "cuala": {
       "command": "node",
       "args": [
-        "/Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js"
+        "/path/to/CUALA/mcp-server/build/index.js"
       ],
       "env": {
         "CUALA_API_URL": "http://localhost:3001"
@@ -82,7 +82,7 @@ This single configuration works for:
 
 **Start all services at once:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 ./quick-start.sh
 ```
 
@@ -195,7 +195,7 @@ cat ~/Library/Application\ Support/Claude/claude_desktop_config.json | jq .mcpSe
 
 **Check build:**
 ```bash
-ls -la /Users/nhaimov/Documents/Private/CUALA/mcp-server/build/index.js
+ls -la /path/to/CUALA/mcp-server/build/index.js
 ```
 
 **Test MCP server directly:**
@@ -212,13 +212,13 @@ curl http://localhost:3001/api/list-plans
 
 **Start API:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/server
+cd /path/to/CUALA/server
 npm run dev
 ```
 
 **Check API logs:**
 ```bash
-tail -f /Users/nhaimov/Documents/Private/CUALA/server/cuala.log
+tail -f /path/to/CUALA/server/cuala.log
 ```
 
 ### Claude Not Seeing Tools
@@ -300,7 +300,7 @@ If Claude asks for permission, you can:
 
 **Test Connection:**
 ```bash
-cd /Users/nhaimov/Documents/Private/CUALA/mcp-server
+cd /path/to/CUALA/mcp-server
 ./test-connection.sh
 ```
 
