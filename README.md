@@ -10,15 +10,15 @@
 
 CUALA is a high-performance, deterministic browser automation system designed to execute natural-language test scenarios. Unlike traditional automation tools, CUALA combines the speed of DOM-based execution with the power of a vision-based "Computer-Using Agent" to handle complex, visually-rendered, or obfuscated web applications.
 
-## 🤖 Claude Integration via MCP
+## 🔌 Model Context Protocol (MCP) Support
 
-**NEW**: CUALA now includes a Model Context Protocol (MCP) server that allows Claude Desktop to control browser automation directly!
+**NEW**: CUALA now includes a Model Context Protocol (MCP) server for seamless integration with AI assistants!
 
 - **19 Tools** for test execution, plan management, and configuration
 - **3 Resources** for viewing executions, plans, and settings
-- **Natural Language Testing** - Just tell Claude what to test
+- **Natural Language Testing** - Describe what you want to test in plain English
 
-👉 **[Get Started with Claude Integration](mcp-server/CLAUDE_SETUP.md)**
+👉 **[Get Started with MCP Integration](mcp-server/README.md)**
 
 ---
 
