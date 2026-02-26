@@ -1,9 +1,19 @@
 # CUALA (Computer-Using Automation Layer Agent)
 
-**Version:** 0.1.0  
-**Status:** Production-Ready Core  
+**Version:** 0.2.0
+**Status:** Production-Ready Core + MCP Integration
 
 CUALA is a high-performance, deterministic browser automation system designed to execute natural-language test scenarios. Unlike traditional automation tools, CUALA combines the speed of DOM-based execution with the power of a vision-based "Computer-Using Agent" to handle complex, visually-rendered, or obfuscated web applications.
+
+## 🤖 Claude Integration via MCP
+
+**NEW**: CUALA now includes a Model Context Protocol (MCP) server that allows Claude Desktop to control browser automation directly!
+
+- **19 Tools** for test execution, plan management, and configuration
+- **3 Resources** for viewing executions, plans, and settings
+- **Natural Language Testing** - Just tell Claude what to test
+
+👉 **[Get Started with Claude Integration](mcp-server/CLAUDE_SETUP.md)**
 
 ---
 
@@ -155,6 +165,10 @@ OPENAI_VISION_MODEL=gpt-4o       # Model for vision-based execution
 # Optional - Storage Configuration
 STORAGE_TYPE=memory              # Storage backend: 'memory' or 'redis' (default: 'memory')
 REDIS_URL=redis://localhost:6379 # Redis connection URL (required if STORAGE_TYPE=redis)
+
+# Optional - Safety Configuration
+SKIP_SAFETY_CHECK=false          # Skip safety checks to avoid rate limits (default: false)
+                                 # Set to 'true' to disable OpenAI moderation API calls
 ```
 
 ### Redis Setup (Optional)
