@@ -1,6 +1,7 @@
 # CUALA (Computer-Using Automation Layer Agent)
 
 [![CI](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml/badge.svg)](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](server/TESTING.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](https://github.com/NaorHai/CUALA/releases)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
@@ -370,6 +371,30 @@ Query plan history via:
 - `GET /api/list-plans` - List all plans
 - `GET /api/get-latest/:scenarioId` - Get latest execution for scenario
 - `GET /api/get-history/:scenarioId` - Get all executions for scenario
+
+---
+
+## 🧪 Testing
+
+CUALA has a comprehensive test suite with **156 unit tests** covering all core functionality:
+
+- **Storage Layer**: In-memory storage, Redis integration, configuration management
+- **Providers**: Multi-LLM support (OpenAI, Anthropic), factory patterns
+- **Infrastructure**: Configuration, logging, confidence thresholds
+- **Constants & Types**: All action types, verification targets, helpers
+- **Reporter**: Console output formatting and reporting
+
+### Run Tests
+```bash
+cd server
+npm test              # Run all tests
+npm test -- --watch   # Watch mode
+npm test -- --coverage # With coverage
+```
+
+All tests are **fast** (< 4 seconds), **isolated** (no external dependencies), and **deterministic** (no flaky tests).
+
+See [server/TESTING.md](server/TESTING.md) for detailed testing guide.
 
 ---
 

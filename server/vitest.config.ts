@@ -16,8 +16,18 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.*',
         '**/test-*.ts',
+        'src/api.ts',
+        'src/run-example.ts',
+        'src/index.ts',
       ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 60,
+        statements: 60,
+      },
     },
     testTimeout: 30000, // 30 seconds for API calls
+    reporters: ['verbose'],
   },
 });
