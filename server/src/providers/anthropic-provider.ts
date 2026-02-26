@@ -4,7 +4,7 @@
  * Wraps Anthropic API in the common ILLMProvider interface
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic, { type ClientOptions } from '@anthropic-ai/sdk';
 import {
   ILLMProvider,
   ILLMProviderConfig,
@@ -26,7 +26,7 @@ export class AnthropicProvider implements ILLMProvider {
     this.config = config;
 
     // Support both public Anthropic API and custom endpoints (e.g., Bedrock gateway)
-    const clientConfig: Anthropic.ClientOptions = {
+    const clientConfig: ClientOptions = {
       apiKey: config.apiKey,
       maxRetries: config.maxRetries || 3,
       timeout: config.timeout || 60000,
@@ -197,11 +197,22 @@ export class AnthropicProvider implements ILLMProvider {
 
   getAvailableModels(): string[] {
     return [
-      'claude-3-5-sonnet-20241022',  // Latest Sonnet
-      'claude-3-5-haiku-20241022',   // Latest Haiku
-      'claude-3-opus-20240229',       // Opus
-      'claude-3-sonnet-20240229',     // Older Sonnet
-      'claude-3-haiku-20240307',      // Older Haiku
+      // Claude 4 Series (Latest - Early 2026)
+      'claude-opus-4-6',              // Most capable, slowest
+      'claude-sonnet-4-6',            // Balanced performance
+      'claude-haiku-4-5-20251001',   // Fast and efficient
+
+      // Claude 3.7 Series (Late 2025)
+      'claude-3-7-sonnet-20250219',  // Enhanced Sonnet
+
+      // Claude 3.5 Series (2024)
+      'claude-3-5-sonnet-20241022',  // Sonnet 3.5
+      'claude-3-5-haiku-20241022',   // Haiku 3.5
+
+      // Claude 3 Series (Early 2024)
+      'claude-3-opus-20240229',      // Opus 3
+      'claude-3-sonnet-20240229',    // Sonnet 3
+      'claude-3-haiku-20240307',     // Haiku 3
     ];
   }
 
