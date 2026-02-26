@@ -96,7 +96,7 @@ export class AnthropicProvider implements ILLMProvider {
       });
 
       // Handle JSON mode differently for Anthropic
-      let actualMaxTokens = options.max_tokens || 4096;
+      const actualMaxTokens = options.max_tokens || 4096;
 
       // For JSON mode, we need to be more explicit with Claude
       const shouldForceJson = options.response_format?.type === 'json_object';

@@ -17,11 +17,12 @@ export async function createStorage(): Promise<IStorage> {
   const storageType = (process.env.STORAGE_TYPE || 'memory').toLowerCase() as StorageType;
 
   switch (storageType) {
-    case 'redis':
+    case 'redis': {
       const redisStorage = new RedisStorage(process.env.REDIS_URL);
       await redisStorage.connect();
       return redisStorage;
-    
+    }
+
     case 'memory':
     default:
       return new InMemoryStorage();

@@ -1,6 +1,5 @@
 import { Page } from 'playwright';
 import { IElementDiscoveryService } from './index.js';
-import { IElementDiscoveryResult } from '../types/index.js';
 import { ILogger } from '../infra/logger.js';
 import { ConfidenceThresholdService } from '../infra/confidence-threshold-service.js';
 
@@ -861,7 +860,7 @@ export class SmartElementLocator {
         
         // For links, try to extract or infer href from description
         // 1. Check if description mentions a URL path directly (e.g., "/health")
-        const hrefMatch = description.match(/\/([a-z0-9\-]+)/i);
+        const hrefMatch = description.match(/\/([a-z0-9-]+)/i);
         if (hrefMatch) {
           const hrefPath = hrefMatch[0].toLowerCase();
           // Try exact match (case-insensitive via lowercase)
