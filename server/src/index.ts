@@ -1,5 +1,6 @@
-import { OpenAIPlanner } from './planner/openai-planner.js';
+import { LLMPlanner } from './planner/llm-planner.js';
 import { AdaptivePlanner } from './planner/adaptive-planner.js';
+import { LLMProviderFactory } from './providers/index.js';
 import { AdaptiveExecutionOrchestrator } from './orchestrator/adaptive-orchestrator.js';
 import { UnifiedExecutor } from './executors/unified/unified-executor.js';
 import { AIVerifier } from './verifier/ai-verifier.js';
@@ -147,7 +148,7 @@ export async function runScenario(
   let testId: string | undefined;
   
   // Initialize components
-  const basePlanner = new OpenAIPlanner(config, logger);
+  const basePlanner = new LLMPlanner(config, logger);
   
   // Initialize element discovery service
   const llmDomStrategy = new LLMDOMStrategy(config, logger);
@@ -285,7 +286,7 @@ export async function runScenarioAsync(
     });
 
     // Initialize components
-    const basePlanner = new OpenAIPlanner(config, logger);
+    const basePlanner = new LLMPlanner(config, logger);
     
     // Initialize element discovery service
     const llmDomStrategy = new LLMDOMStrategy(config, logger);
@@ -431,7 +432,7 @@ export async function runPlan(
     logger.info('Starting plan execution', { testId, planId, scenarioId: plan.scenarioId });
     
     // Initialize components for execution
-    const basePlanner = new OpenAIPlanner(config, logger);
+    const basePlanner = new LLMPlanner(config, logger);
     const llmDomStrategy = new LLMDOMStrategy(config, logger);
     const elementDiscovery = new MultiStrategyElementDiscovery(
       [llmDomStrategy],
@@ -532,7 +533,7 @@ export async function runPlanAsync(
     logger.info('Starting async plan execution', { testId, planId, scenarioId: plan.scenarioId });
     
     // Initialize components for execution
-    const basePlanner = new OpenAIPlanner(config, logger);
+    const basePlanner = new LLMPlanner(config, logger);
     const llmDomStrategy = new LLMDOMStrategy(config, logger);
     const elementDiscovery = new MultiStrategyElementDiscovery(
       [llmDomStrategy],
@@ -649,7 +650,7 @@ export async function generatePlanAsync(
     }
     
     // Initialize planner
-    const basePlanner = new OpenAIPlanner(config, logger);
+    const basePlanner = new LLMPlanner(config, logger);
     
     // Initialize element discovery service
     const llmDomStrategy = new LLMDOMStrategy(config, logger);
@@ -764,7 +765,7 @@ export async function generatePlan(
   }
   
   // Initialize planner
-  const basePlanner = new OpenAIPlanner(config, logger);
+  const basePlanner = new LLMPlanner(config, logger);
   
   // Initialize element discovery service
   const llmDomStrategy = new LLMDOMStrategy(config, logger);

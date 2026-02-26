@@ -1,7 +1,7 @@
 # CUALA (Computer-Using Automation Layer Agent)
 
-**Version:** 0.2.0
-**Status:** Production-Ready Core + MCP Integration
+**Version:** 0.3.0
+**Status:** Production-Ready Core + MCP Integration + Multi-LLM Support
 
 CUALA is a high-performance, deterministic browser automation system designed to execute natural-language test scenarios. Unlike traditional automation tools, CUALA combines the speed of DOM-based execution with the power of a vision-based "Computer-Using Agent" to handle complex, visually-rendered, or obfuscated web applications.
 
@@ -131,7 +131,9 @@ Plans progress through phases:
 ### Prerequisites
 - Node.js (v18+)
 - Playwright browsers
-- OpenAI API Key (for Planner and Verifier)
+- LLM Provider API Key:
+  - **OpenAI** API Key (for GPT-4o, GPT-4o-mini models), OR
+  - **Anthropic** API Key (for Claude 3.5 Sonnet, Claude 3.5 Haiku models)
 
 ### Installation
 ```bash
@@ -147,10 +149,28 @@ npx playwright install chromium
 
 ### Configuration
 Create a `.env` file in the `server/` directory:
+
 ```env
-# Required
-OPENAI_API_KEY=your_key_here
-OPENAI_MODEL=gpt-4o
+# =============================================================================
+# LLM Provider Selection
+# =============================================================================
+LLM_PROVIDER=openai  # Options: 'openai' or 'anthropic'
+
+# -----------------------------------------------------------------------------
+# OpenAI Configuration (if LLM_PROVIDER=openai)
+# -----------------------------------------------------------------------------
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MODEL=gpt-4o                    # Default model
+OPENAI_VISION_MODEL=gpt-4o             # Vision model
+OPENAI_PLANNER_MODEL=gpt-4o-mini       # Planning model (cheaper/faster)
+
+# -----------------------------------------------------------------------------
+# Anthropic Configuration (if LLM_PROVIDER=anthropic)
+# -----------------------------------------------------------------------------
+ANTHROPIC_API_KEY=your_anthropic_key_here
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022           # Default model
+ANTHROPIC_VISION_MODEL=claude-3-5-sonnet-20241022    # Vision model
+ANTHROPIC_PLANNER_MODEL=claude-3-5-haiku-20241022    # Planning model (cheaper/faster)
 
 # Optional - Refinement Configuration
 MAX_RETRIES=2                    # Maximum retry attempts for failed steps
@@ -160,7 +180,6 @@ PROACTIVE_REFINEMENT=true        # Enable proactive refinement before execution
 # Optional - Execution Configuration
 LOG_LEVEL=info                   # Log level: debug, info, warn, error
 HEADLESS=true                    # Run browser in headless mode
-OPENAI_VISION_MODEL=gpt-4o       # Model for vision-based execution
 
 # Optional - Storage Configuration
 STORAGE_TYPE=memory              # Storage backend: 'memory' or 'redis' (default: 'memory')
@@ -169,6 +188,40 @@ REDIS_URL=redis://localhost:6379 # Redis connection URL (required if STORAGE_TYP
 # Optional - Safety Configuration
 SKIP_SAFETY_CHECK=false          # Skip safety checks to avoid rate limits (default: false)
                                  # Set to 'true' to disable OpenAI moderation API calls
+                                 # Note: Safety check only available with OpenAI provider
+```
+
+### LLM Provider Support
+
+CUALA supports multiple LLM providers for maximum flexibility:
+
+#### OpenAI (GPT-4)
+- **Models**: GPT-4o, GPT-4o-mini, GPT-4-turbo
+- **Features**: Native JSON mode, vision support, moderation API
+- **Use case**: Excellent all-around performance with strong vision capabilities
+- **Cost**: Moderate to high
+
+#### Anthropic Claude
+- **Models**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
+- **Features**: Vision support, long context windows, strong reasoning
+- **Use case**: Superior reasoning for complex scenarios, cost-effective Haiku model
+- **Cost**: Competitive pricing, especially with Haiku
+
+#### Switching Providers
+
+Simply set `LLM_PROVIDER` in your `.env` file:
+
+```env
+# Use OpenAI
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_key_here
+
+# Or use Anthropic
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your_key_here
+```
+
+**Note**: Safety checking (moderation API) is only available when using OpenAI provider.
 ```
 
 ### Redis Setup (Optional)

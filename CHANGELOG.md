@@ -5,6 +5,55 @@ All notable changes to CUALA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-26
+
+### Added
+
+#### 🤖 Multi-LLM Provider Support
+- **Provider Abstraction Layer** - Clean interface for multiple LLM providers
+- **Anthropic Claude Support** - Full integration with Claude 3.5 Sonnet and Haiku
+- **Provider Factory** - Automatic provider selection based on configuration
+- **Flexible Configuration** - Easy switching between OpenAI and Anthropic
+
+#### Supported Providers
+**OpenAI**
+- GPT-4o, GPT-4o-mini, GPT-4-turbo
+- Native JSON mode support
+- Vision capabilities
+- Moderation API integration
+
+**Anthropic Claude**
+- Claude 3.5 Sonnet (latest, most capable)
+- Claude 3.5 Haiku (faster, cost-effective)
+- Claude 3 Opus (maximum capability)
+- Excellent reasoning and vision support
+
+#### New Configuration Options
+- `LLM_PROVIDER` - Select 'openai' or 'anthropic'
+- `ANTHROPIC_API_KEY` - API key for Claude
+- `ANTHROPIC_MODEL` - Default Claude model
+- `ANTHROPIC_VISION_MODEL` - Claude model for vision tasks
+- `ANTHROPIC_PLANNER_MODEL` - Claude model for planning
+
+#### Technical Implementation
+- Created `ILLMProvider` interface with common abstraction
+- Implemented `OpenAIProvider` adapter
+- Implemented `AnthropicProvider` adapter
+- Updated all components to use provider abstraction (Planner, Verifier, Element Discovery)
+- Added provider factory with configuration-based instantiation
+
+### Changed
+- Refactored `OpenAIPlanner` to `LLMPlanner` (provider-agnostic)
+- Updated all LLM-using components to work with provider abstraction
+- Enhanced `.env.example` with comprehensive provider configuration
+
+### Technical Details
+- **Dependencies**: Added `@anthropic-ai/sdk` ^0.32.1
+- **Architecture**: Provider pattern for LLM abstraction
+- **Backward Compatible**: Existing OpenAI configurations continue to work
+
+---
+
 ## [0.2.0] - 2026-02-26
 
 ### Added

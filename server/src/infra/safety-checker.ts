@@ -92,7 +92,7 @@ export class SafetyChecker {
   /**
    * Generate a user-friendly reason for why the scenario was flagged
    */
-  private generateReason(categories: string[], scores: Record<string, number>): string {
+  private generateReason(categories: string[], scores: any): string {
     const categoryMessages: Record<string, string> = {
       'hate': 'contains hate speech or discriminatory content',
       'hate/threatening': 'contains threatening hate speech',
