@@ -301,4 +301,116 @@ describe('LLM Provider Abstraction', () => {
       });
     });
   });
+
+  describe('Bedrock Gateway / Custom Endpoint Support', () => {
+    it('should support custom base URL configuration', () => {
+      const customConfig: ILLMProviderConfig = {
+        apiKey: 'test-token',
+        baseURL: 'https://custom-gateway.example.com/bedrock',
+        defaultModel: 'claude-3-5-sonnet-20241022',
+      };
+
+      const provider = new AnthropicProvider(customConfig, logger);
+      expect(provider).toBeDefined();
+      expect(provider.name).toBe('anthropic');
+    });
+
+    it('should work without base URL (public API)', () => {
+      const publicConfig: ILLMProviderConfig = {
+        apiKey: 'test-token',
+        // No baseURL - should use public API
+        defaultModel: 'claude-3-5-sonnet-20241022',
+      };
+
+      const provider = new AnthropicProvider(publicConfig, logger);
+      expect(provider).toBeDefined();
+      expect(provider.name).toBe('anthropic');
+    });
+
+    it('should detect Bedrock configuration from environment', () => {
+      // Create mock config with Bedrock settings
+      const mockConfig = {
+        get: (key: string) => {
+          const mockEnv: Record<string, string> = {
+            ANTHROPIC_BEDROCK_BASE_URL: 'https://bedrock.example.com',
+            ANTHROPIC_AUTH_TOKEN: 'bedrock-token-123',
+            ANTHROPIC_MODEL: 'claude-3-5-sonnet-20241022',
+          };
+          return mockEnv[key];
+        },
+      };
+
+      const provider = LLMProviderFactory.create('anthropic', mockConfig as any, logger);
+      expect(provider).toBeDefined();
+      expect(provider.name).toBe('anthropic');
+    });
+
+    it('should prefer AUTH_TOKEN over API_KEY when using Bedrock', () => {
+      const mockConfig = {
+        get: (key: string) => {
+          const mockEnv: Record<string, string> = {
+            ANTHROPIC_BEDROCK_BASE_URL: 'https://bedrock.example.com',
+            ANTHROPIC_AUTH_TOKEN: 'bedrock-token',
+            ANTHROPIC_API_KEY: 'public-api-key',
+            ANTHROPIC_MODEL: 'claude-3-5-sonnet-20241022',
+          };
+          return mockEnv[key];
+        },
+      };
+
+      // Should not throw - has AUTH_TOKEN
+      const provider = LLMProviderFactory.create('anthropic', mockConfig as any, logger);
+      expect(provider).toBeDefined();
+    });
+
+    it('should fallback to API_KEY if AUTH_TOKEN not present with Bedrock', () => {
+      const mockConfig = {
+        get: (key: string) => {
+          const mockEnv: Record<string, string> = {
+            ANTHROPIC_BEDROCK_BASE_URL: 'https://bedrock.example.com',
+            ANTHROPIC_API_KEY: 'fallback-key',
+            ANTHROPIC_MODEL: 'claude-3-5-sonnet-20241022',
+          };
+          return mockEnv[key];
+        },
+      };
+
+      const provider = LLMProviderFactory.create('anthropic', mockConfig as any, logger);
+      expect(provider).toBeDefined();
+    });
+
+    it('should throw error if no credentials with Bedrock URL', () => {
+      const mockConfig = {
+        get: (key: string) => {
+          const mockEnv: Record<string, string> = {
+            ANTHROPIC_BEDROCK_BASE_URL: 'https://bedrock.example.com',
+            ANTHROPIC_MODEL: 'claude-3-5-sonnet-20241022',
+          };
+          return mockEnv[key];
+        },
+      };
+
+      expect(() => {
+        LLMProviderFactory.create('anthropic', mockConfig as any, logger);
+      }).toThrow('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is required');
+    });
+
+    it('should handle Salesforce Bedrock gateway format', () => {
+      const mockConfig = {
+        get: (key: string) => {
+          const mockEnv: Record<string, string> = {
+            ANTHROPIC_BEDROCK_BASE_URL:
+              'https://eng-ai-model-gateway.sfproxy.devx-preprod.aws-esvc1-useast2.aws.sfdc.cl/bedrock',
+            ANTHROPIC_AUTH_TOKEN: 'sf-internal-token',
+            ANTHROPIC_MODEL: 'claude-3-5-sonnet-20241022',
+          };
+          return mockEnv[key];
+        },
+      };
+
+      const provider = LLMProviderFactory.create('anthropic', mockConfig as any, logger);
+      expect(provider).toBeDefined();
+      expect(provider.name).toBe('anthropic');
+    });
+  });
 });

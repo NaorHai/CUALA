@@ -24,15 +24,26 @@ export class AnthropicProvider implements ILLMProvider {
     private logger: ILogger
   ) {
     this.config = config;
-    this.client = new Anthropic({
+
+    // Support both public Anthropic API and custom endpoints (e.g., Bedrock gateway)
+    const clientConfig: Anthropic.ClientOptions = {
       apiKey: config.apiKey,
       maxRetries: config.maxRetries || 3,
       timeout: config.timeout || 60000,
-    });
+    };
+
+    // Add custom base URL if provided (for enterprise/Bedrock deployments)
+    if (config.baseURL) {
+      clientConfig.baseURL = config.baseURL;
+      this.logger.info('Using custom Anthropic base URL', { baseURL: config.baseURL });
+    }
+
+    this.client = new Anthropic(clientConfig);
 
     this.logger.info('Anthropic provider initialized', {
       defaultModel: config.defaultModel,
       visionModel: config.visionModel,
+      customEndpoint: !!config.baseURL,
     });
   }
 
@@ -109,12 +120,31 @@ export class AnthropicProvider implements ILLMProvider {
         messages,
       });
 
+      // Debug: Log full response for Bedrock troubleshooting
+      if (this.config.baseURL) {
+        this.logger.info('Bedrock raw response', {
+          response: JSON.stringify(response, null, 2).substring(0, 500),
+          keys: Object.keys(response),
+          contentExists: 'content' in response,
+          contentValue: response.content,
+        });
+      }
+
       // Extract text content
+      // Handle both standard Anthropic API and Bedrock gateway formats
       let content = '';
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          content += block.text;
+      if (typeof response.content === 'string') {
+        // Bedrock gateway format - content is a string
+        content = response.content;
+      } else if (Array.isArray(response.content)) {
+        // Standard Anthropic API format - content is an array of blocks
+        for (const block of response.content) {
+          if (block.type === 'text') {
+            content += block.text;
+          }
         }
+      } else {
+        this.logger.warn('Unexpected response content format', { contentType: typeof response.content });
       }
 
       if (!content) {

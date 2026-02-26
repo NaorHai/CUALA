@@ -59,11 +59,28 @@ export class LLMProviderFactory {
 
   /**
    * Create Anthropic provider
+   * Supports both:
+   * - Public Anthropic API (ANTHROPIC_API_KEY)
+   * - Custom endpoints like Bedrock gateway (ANTHROPIC_BEDROCK_BASE_URL + ANTHROPIC_AUTH_TOKEN)
    */
   private static createAnthropicProvider(config: IConfig, logger: ILogger): AnthropicProvider {
-    const apiKey = config.get('ANTHROPIC_API_KEY');
+    // Check for custom base URL (e.g., Bedrock gateway)
+    const baseURL = config.get('ANTHROPIC_BEDROCK_BASE_URL');
+
+    // Determine which API key to use
+    let apiKey: string | undefined;
+    if (baseURL) {
+      // Using custom endpoint - prefer ANTHROPIC_AUTH_TOKEN, fallback to ANTHROPIC_API_KEY
+      apiKey = config.get('ANTHROPIC_AUTH_TOKEN') || config.get('ANTHROPIC_API_KEY');
+      logger.info('Using Anthropic with custom base URL (e.g., Bedrock gateway)', { baseURL });
+    } else {
+      // Using public Anthropic API
+      apiKey = config.get('ANTHROPIC_API_KEY');
+    }
+
     if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is required for Anthropic provider');
+      const requiredKey = baseURL ? 'ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY' : 'ANTHROPIC_API_KEY';
+      throw new Error(`${requiredKey} is required for Anthropic provider`);
     }
 
     const providerConfig: ILLMProviderConfig = {
@@ -73,6 +90,7 @@ export class LLMProviderFactory {
       plannerModel: config.get('ANTHROPIC_PLANNER_MODEL') || 'claude-3-5-haiku-20241022',
       maxRetries: 3,
       timeout: 60000,
+      baseURL, // Will be undefined for public API, custom URL for Bedrock
     };
 
     return new AnthropicProvider(providerConfig, logger);

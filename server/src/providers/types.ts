@@ -78,6 +78,7 @@ export interface ILLMProviderConfig {
   plannerModel?: string;
   maxRetries?: number;
   timeout?: number;
+  baseURL?: string; // Optional custom base URL (e.g., for Bedrock gateway)
 }
 
 export type LLMProviderType = 'openai' | 'anthropic';
