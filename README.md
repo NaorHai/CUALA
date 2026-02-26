@@ -1,5 +1,10 @@
 # CUALA (Computer-Using Automation Layer Agent)
 
+[![CI](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml/badge.svg)](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](https://github.com/NaorHai/CUALA/releases)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+
 **Version:** 0.3.0
 **Status:** Production-Ready Core + MCP Integration + Multi-LLM Support
 
