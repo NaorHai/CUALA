@@ -46,18 +46,28 @@ RULES:
 8. If an element cannot be found in DOM, mark confidence as low (<0.5) and keep original selector
 9. Document all refinements in the refinements array
 
-CRITICAL: REMOVE UNNECESSARY STEPS
+CRITICAL: REMOVE UNNECESSARY STEPS (WITH CAUTION)
 10. Analyze if any steps are unnecessary based on the current DOM state:
     - If a step says "click X to reveal Y" but Y is already visible in the DOM, REMOVE that step
     - If a step says "open form/modal" but the form/modal is already visible, REMOVE that step
     - If a step is a prerequisite that's no longer needed, REMOVE it
-    - Examples:
-      * Step: "Click login button to reveal login form" → If login form is already visible → REMOVE step
-      * Step: "Open modal" → If modal is already open → REMOVE step
-      * Step: "Click dropdown to open menu" → If menu is already open → REMOVE step
-11. For removed steps, include them in the "removedSteps" array with the stepId and reason
-12. The "steps" array should only contain steps that are still needed (excluding removed steps)
-13. When removing steps, ensure subsequent steps still make sense (e.g., don't remove a step that other steps depend on)
+    - Examples of steps TO REMOVE:
+      * Step: "Click hamburger menu to reveal navigation" → If navigation is already visible → REMOVE
+      * Step: "Open modal" → If modal is already open → REMOVE
+      * Step: "Click dropdown to open menu" → If menu is already open → REMOVE
+      * Step: "Wait for form to load" → If form is already visible → REMOVE
+
+11. **NEVER REMOVE ACTION STEPS** - Steps that perform critical actions must NEVER be removed:
+    - **Submit buttons**: "Click login button", "Click submit", "Submit form" - KEEP THESE
+    - **Primary actions**: "Click save", "Click delete", "Click confirm" - KEEP THESE
+    - **Navigation actions**: "Click link to go to...", "Navigate to..." - KEEP THESE
+    - **Data entry**: "Type in field", "Select option" - KEEP THESE
+    - Rule of thumb: If the step DOES something (submit, save, navigate), NEVER remove it
+    - Only remove steps that just REVEAL UI elements that are already visible
+
+12. For removed steps, include them in the "removedSteps" array with the stepId and reason
+13. The "steps" array should only contain steps that are still needed (excluding removed steps)
+14. When removing steps, ensure subsequent steps still make sense (e.g., don't remove a step that other steps depend on)
 
 REFINEMENT PRIORITY:
 - High confidence (0.8+): Unique identifier found (id, data-testid)

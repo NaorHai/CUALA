@@ -33,7 +33,7 @@ export class DOMExtractor {
 
     try {
       return await page.evaluate(
-        function(opts: { maxElements: number; includePosition: boolean; includeContainers: boolean }) {
+        (opts) => {
           function extractElementInfo(el: Element, includePos: boolean): any {
             const info: any = {
               tag: el.tagName.toLowerCase(),

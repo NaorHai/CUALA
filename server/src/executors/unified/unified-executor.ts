@@ -33,6 +33,8 @@ export class UnifiedExecutor implements IExecutor {
   private model: string;
   private promptManager: PromptManager;
   private smartLocator: SmartElementLocator;
+  private recursionDepth: number = 0; // Track recursion to prevent infinite loops
+  private readonly MAX_RECURSION_DEPTH = 2; // Max DOM↔Vision cycles
 
   constructor(
     private config: IConfig,
@@ -179,6 +181,9 @@ export class UnifiedExecutor implements IExecutor {
           throw new Error(ERROR_MESSAGES.UNSUPPORTED_ACTION(action.name));
       }
 
+      // Reset recursion depth on success
+      this.recursionDepth = 0;
+
       return {
         stepId: (action as any).stepId || 'unknown',
         selector: selector, // Store the selector that was used
@@ -187,8 +192,22 @@ export class UnifiedExecutor implements IExecutor {
         timestamp: Date.now(),
       };
     } catch (error) {
+      // Check recursion depth before fallback
+      if (this.recursionDepth >= this.MAX_RECURSION_DEPTH) {
+        this.logger.error(`Max recursion depth reached (${this.MAX_RECURSION_DEPTH}), stopping retries`, {
+          testId: (action as any).testId,
+          selector,
+          recursionDepth: this.recursionDepth
+        });
+        throw new Error(`Element discovery failed after ${this.MAX_RECURSION_DEPTH} retry cycles: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
       // DOM failed, try vision as fallback
-      this.logger.warn(`DOM execution failed, trying vision fallback`, { error, selector });
+      this.recursionDepth++;
+      this.logger.warn(`DOM execution failed, trying vision fallback (depth ${this.recursionDepth}/${this.MAX_RECURSION_DEPTH})`, {
+        error: error instanceof Error ? error.name : 'Unknown',
+        selector
+      });
       const description = (action.arguments.description as string) || selector;
       return await this.executeViaVision(action, description);
     }
@@ -263,7 +282,17 @@ export class UnifiedExecutor implements IExecutor {
           confidence: location.confidence,
           method: 'DOM-based discovery (formerly Vision AI fallback)'
         });
-        
+
+        // Check recursion depth before calling back to DOM
+        if (this.recursionDepth >= this.MAX_RECURSION_DEPTH) {
+          this.logger.error(`Max recursion depth reached (${this.MAX_RECURSION_DEPTH}), stopping retries`, {
+            testId: (action as any).testId,
+            selector: location.selector,
+            recursionDepth: this.recursionDepth
+          });
+          throw new Error(`Element discovery failed after ${this.MAX_RECURSION_DEPTH} retry cycles. Last attempted selector: ${location.selector}`);
+        }
+
         // Execute via DOM (getSnapshot will capture screenshot automatically)
         const result = await this.executeViaDOM(action, location.selector);
         
