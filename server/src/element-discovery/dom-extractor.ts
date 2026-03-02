@@ -32,6 +32,7 @@ export class DOMExtractor {
     } = options;
 
     try {
+      // Use arrow function without TypeScript annotations to avoid __name transpilation issues
       return await page.evaluate(
         (opts) => {
           function extractElementInfo(el: Element, includePos: boolean): any {

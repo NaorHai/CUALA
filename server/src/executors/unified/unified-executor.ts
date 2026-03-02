@@ -214,9 +214,12 @@ export class UnifiedExecutor implements IExecutor {
   }
 
   /**
-   * Execute action via DOM-based discovery (fallback when DOM selector not available)
-   * Uses intelligent DOM analysis instead of screenshot-based Vision AI
-   * Screenshots are still captured in snapshots for user presentation
+   * Execute action via intelligent element discovery (fallback when direct DOM selector fails)
+   * Named executeViaVision for historical reasons, but now uses DOM-based discovery
+   * instead of screenshot-based Vision AI for better performance and reliability.
+   * Screenshots are still captured in snapshots for user presentation.
+   *
+   * Includes retry logic with recursion depth tracking to prevent infinite loops.
    */
   private async executeViaVision(action: IAction, description: string): Promise<IExecutionResult> {
     this.logger.debug(`Executing via DOM-based discovery: ${action.name}`, { description, testId: (action as any).testId });
@@ -283,7 +286,8 @@ export class UnifiedExecutor implements IExecutor {
           method: 'DOM-based discovery (formerly Vision AI fallback)'
         });
 
-        // Check recursion depth before calling back to DOM
+        // Check recursion depth before calling back to DOM to prevent infinite loops
+        // (executeViaDOM can fail and call back to executeViaVision, creating a cycle)
         if (this.recursionDepth >= this.MAX_RECURSION_DEPTH) {
           this.logger.error(`Max recursion depth reached (${this.MAX_RECURSION_DEPTH}), stopping retries`, {
             testId: (action as any).testId,
@@ -293,7 +297,7 @@ export class UnifiedExecutor implements IExecutor {
           throw new Error(`Element discovery failed after ${this.MAX_RECURSION_DEPTH} retry cycles. Last attempted selector: ${location.selector}`);
         }
 
-        // Execute via DOM (getSnapshot will capture screenshot automatically)
+        // Execute via DOM (may recurse back to executeViaVision if it fails)
         const result = await this.executeViaDOM(action, location.selector);
         
         // Ensure screenshot is in snapshot for user presentation (getSnapshot already does this, but double-check)

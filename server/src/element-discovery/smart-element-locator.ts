@@ -244,7 +244,7 @@ export class SmartElementLocator {
       this.logger.debug(`INTELLIGENT DOM SEARCH: Searching for "${description}"`, { testId, actionType });
       
       // Extract all candidate elements and score them
-      // Use function declaration instead of arrow function to avoid __name transpilation issues
+      // Use arrow function without TypeScript annotations to avoid __name transpilation issues
       const candidates = await page.evaluate((args) => {
         const desc = args.desc;
         const actType = args.actType;
