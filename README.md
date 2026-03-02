@@ -3,10 +3,10 @@
 [![CI](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml/badge.svg)](https://github.com/NaorHai/CUALA/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](server/TESTING.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](https://github.com/NaorHai/CUALA/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/NaorHai/CUALA/releases)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
-**Version:** 0.3.0
+**Version:** 1.0.0
 **Status:** Production-Ready Core + MCP Integration + Multi-LLM Support
 
 CUALA is a high-performance, deterministic browser automation system designed to execute natural-language test scenarios. Unlike traditional automation tools, CUALA combines the speed of DOM-based execution with the power of a vision-based "Computer-Using Agent" to handle complex, visually-rendered, or obfuscated web applications.
