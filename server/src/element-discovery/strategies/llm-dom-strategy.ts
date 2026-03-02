@@ -34,14 +34,8 @@ export class LLMDOMStrategy implements IElementDiscoveryStrategy {
     // Use provider abstraction instead of direct OpenAI client
     this.provider = LLMProviderFactory.createFromConfig(config, logger);
 
-    // Get model from provider
-    if (this.provider.name === 'openai') {
-      this.model = (this.provider as any).getDefaultModel?.() || config.get('OPENAI_MODEL') || 'gpt-4-turbo-preview';
-    } else if (this.provider.name === 'anthropic') {
-      this.model = (this.provider as any).getDefaultModel?.() || config.get('ANTHROPIC_MODEL') || 'claude-3-5-haiku-20241022';
-    } else {
-      this.model = 'default';
-    }
+    // Get model from provider using polymorphic interface method (SOLID compliance)
+    this.model = this.provider.getDefaultModel();
 
     this.promptManager = PromptManager.getInstance();
 
