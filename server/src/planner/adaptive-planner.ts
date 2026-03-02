@@ -1,8 +1,8 @@
 import { IPlanner } from './index.js';
-import { 
-  ITestScenario, 
-  IExecutionPlan, 
-  IAdaptivePlan, 
+import {
+  ITestScenario,
+  IExecutionPlan,
+  IAdaptivePlan,
   IPlanRefinement,
   IStep,
   IRefinedStep,
@@ -13,17 +13,24 @@ import { ILogger } from '../infra/logger.js';
 import { IConfig } from '../infra/config.js';
 import { PromptManager } from '../infra/prompt-manager.js';
 import { IElementDiscoveryService } from '../element-discovery/index.js';
+import { RetryStrategy, CircuitBreaker, RetryableError, createDefaultRetryStrategy, createDefaultCircuitBreaker } from '../infra/retry-utils.js';
+import { DOMCache, createDefaultDOMCache } from '../infra/dom-cache.js';
 import OpenAI from 'openai';
 import { Page } from 'playwright';
 
 /**
- * Adaptive Planner that wraps a base planner and adds refinement capabilities
+ * Adaptive Planner v1.0
+ * Refactored with retry logic, circuit breaker, and DOM caching for production stability
  */
 export class AdaptivePlanner implements IPlanner {
   private basePlanner: IPlanner;
   private client: OpenAI;
   private model: string;
   private promptManager: PromptManager;
+  private retryStrategy: RetryStrategy;
+  private circuitBreaker: CircuitBreaker;
+  private domCache: DOMCache;
+  private maxRefinementHistory: number;
 
   constructor(
     basePlanner: IPlanner,
@@ -39,6 +46,32 @@ export class AdaptivePlanner implements IPlanner {
     this.client = new OpenAI({ apiKey });
     this.model = config.get('OPENAI_MODEL') || 'gpt-4-turbo-preview';
     this.promptManager = PromptManager.getInstance();
+
+    // Initialize retry strategy with configuration
+    const maxRetries = parseInt(config.get('MAX_RETRIES') || '3');
+    this.retryStrategy = createDefaultRetryStrategy(logger);
+
+    // Initialize circuit breaker for LLM calls
+    this.circuitBreaker = createDefaultCircuitBreaker(logger);
+
+    // Initialize DOM cache with configuration
+    const domCacheSize = parseInt(config.get('DOM_CACHE_SIZE') || '100');
+    const domCacheTTL = parseInt(config.get('DOM_CACHE_TTL') || '60') * 1000; // Convert to ms
+    this.domCache = new DOMCache({
+      maxSize: domCacheSize,
+      ttl: domCacheTTL,
+      maxEntrySize: 500 * 1024 // 500KB max per entry
+    }, logger);
+
+    // Max refinement history entries (prevent unbounded growth)
+    this.maxRefinementHistory = parseInt(config.get('MAX_REFINEMENT_HISTORY') || '20');
+
+    logger.info('AdaptivePlanner v1.0 initialized', {
+      maxRetries,
+      domCacheSize,
+      domCacheTTLSeconds: domCacheTTL / 1000,
+      maxRefinementHistory: this.maxRefinementHistory
+    });
   }
 
   /**
@@ -47,7 +80,7 @@ export class AdaptivePlanner implements IPlanner {
   async plan(scenario: ITestScenario): Promise<IExecutionPlan> {
     this.logger.info('Generating initial plan', { scenarioId: scenario.id });
     const initialPlan = await this.basePlanner.plan(scenario);
-    
+
     // Convert to adaptive plan with phase
     const adaptivePlan: IAdaptivePlan = {
       ...initialPlan,
@@ -60,17 +93,17 @@ export class AdaptivePlanner implements IPlanner {
   }
 
   /**
-   * Refine plan after DOM inspection
+   * Smart plan refinement - only refines steps that need it
+   * v1.0: Uses retry logic, circuit breaker, and DOM caching
    */
   async refinePlan(
     plan: IExecutionPlan,
     page: Page,
     executedSteps: IExecutionResult[] = []
   ): Promise<IAdaptivePlan> {
-    // Extract testId from scenarioId (in async flows, scenarioId equals testId)
     const testId = plan.scenarioId;
-    
-    this.logger.info('PLAN REFINEMENT: Starting plan refinement', { 
+
+    this.logger.info('PLAN REFINEMENT v1.0: Starting smart refinement', {
       testId,
       planId: plan.id,
       planPhase: (plan as IAdaptivePlan).phase || 'initial',
@@ -79,79 +112,76 @@ export class AdaptivePlanner implements IPlanner {
       pageUrl: page.url()
     });
 
-    // Convert plan to adaptive plan if needed (outside try block for catch access)
-    const adaptivePlan: IAdaptivePlan = (plan as IAdaptivePlan).phase 
-      ? plan as IAdaptivePlan 
+    // Convert plan to adaptive plan if needed
+    const adaptivePlan: IAdaptivePlan = (plan as IAdaptivePlan).phase
+      ? plan as IAdaptivePlan
       : { ...plan, phase: 'initial', refinementHistory: [] };
 
     try {
-      // Extract DOM structure
-      this.logger.debug('PLAN REFINEMENT: Extracting DOM structure', { testId, planId: plan.id });
-      const domStructure = await this.extractDOMStructure(page);
+      // Extract or get cached DOM structure
       const url = page.url();
-      
-      this.logger.debug('PLAN REFINEMENT: DOM structure extracted', {
-        testId,
-        planId: plan.id,
-        domStructureLength: domStructure.length,
-        url
-      });
+      let domStructure = this.domCache.get(url);
 
-    // Prepare executed steps summary
-    const executedStepsSummary = executedSteps.map(r => ({
-      stepId: r.stepId,
-      status: r.status,
-      error: r.error
-    }));
-
-    // Use LLM to refine the plan
-    const systemPrompt = this.promptManager.render('planner-refine-system', {});
-    const userPrompt = this.promptManager.render('planner-refine-user', {
-      originalPlan: JSON.stringify(adaptivePlan, null, 2),
-      domStructure: domStructure.substring(0, 15000), // Limit size
-      url,
-      executedSteps: JSON.stringify(executedStepsSummary, null, 2)
-    });
-
-      this.logger.debug('PLAN REFINEMENT: Calling LLM for refinement', {
-        testId,
-        planId: plan.id,
-        model: this.model,
-        promptLength: userPrompt.length
-      });
-
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        this.logger.error('PLAN REFINEMENT: LLM returned empty response', { testId, planId: plan.id });
-        throw new Error('Planner refinement returned empty response');
+      if (!domStructure) {
+        this.logger.debug('PLAN REFINEMENT: DOM cache miss, extracting structure', { testId, url });
+        domStructure = await this.extractDOMStructure(page);
+        this.domCache.set(url, domStructure);
+      } else {
+        this.logger.debug('PLAN REFINEMENT: DOM cache hit', { testId, url });
       }
+
+      // Prepare executed steps summary
+      const executedStepsSummary = executedSteps.map(r => ({
+        stepId: r.stepId,
+        status: r.status,
+        error: r.error
+      }));
+
+      // Use LLM to refine plan with retry and circuit breaker
+      const systemPrompt = this.promptManager.render('planner-refine-system', {});
+      const userPrompt = this.promptManager.render('planner-refine-user', {
+        originalPlan: JSON.stringify(adaptivePlan, null, 2),
+        domStructure: domStructure.substring(0, 15000), // Limit size
+        url,
+        executedSteps: JSON.stringify(executedStepsSummary, null, 2)
+      });
+
+      this.logger.debug('PLAN REFINEMENT: Calling LLM with retry protection', {
+        testId,
+        planId: plan.id,
+        model: this.model
+      });
+
+      // Call LLM with retry strategy and circuit breaker
+      const content = await this.callLLMWithProtection('plan-refinement', async () => {
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+          throw new RetryableError('LLM returned empty response for plan refinement');
+        }
+        return content;
+      });
 
       this.logger.debug('PLAN REFINEMENT: Parsing LLM response', { testId, planId: plan.id });
       const parsed = JSON.parse(content);
-      
+
       if (parsed.error) {
-        this.logger.error('PLAN REFINEMENT: LLM returned error', {
-          testId,
-          planId: plan.id,
-          error: parsed.error
-        });
         throw new Error(`Plan refinement failed: ${parsed.error}`);
       }
 
       // Handle removed steps
       const removedStepIds = new Set<string>();
       const removedStepsInfo: Array<{ stepId: string; reason: string }> = parsed.removedSteps || [];
-      
+
       removedStepsInfo.forEach(removed => {
         removedStepIds.add(removed.stepId);
         this.logger.info('PLAN REFINEMENT: Step marked for removal', {
@@ -161,7 +191,7 @@ export class AdaptivePlanner implements IPlanner {
         });
       });
 
-      // Create a map of refined steps by ID for easier lookup
+      // Create map of refined steps
       const refinedStepsMap = new Map<string, any>();
       if (parsed.steps && Array.isArray(parsed.steps)) {
         parsed.steps.forEach((refinedStep: any) => {
@@ -171,12 +201,12 @@ export class AdaptivePlanner implements IPlanner {
         });
       }
 
-      // Refine steps with discovered selectors, filtering out removed steps
+      // Refine steps with discovered selectors
       const refinedSteps: IRefinedStep[] = adaptivePlan.steps
-        .filter(step => !removedStepIds.has(step.id)) // Remove steps marked for removal
+        .filter(step => !removedStepIds.has(step.id))
         .map((step) => {
           const refinedStepData = refinedStepsMap.get(step.id);
-          
+
           // Only refine interaction steps
           const interactionActions = ['click', 'type', 'hover'];
           const isInteractionStep = interactionActions.includes(step.action.name) ||
@@ -191,25 +221,14 @@ export class AdaptivePlanner implements IPlanner {
           const confidence = refinedStepData.action?.arguments?.confidence as number || 0.5;
           const alternatives = refinedStepData.action?.arguments?.alternatives as string[] || [];
 
-          // Try element discovery if LLM refinement didn't work well
+          // Skip refinement if confidence is too low
           if (!refinedSelector || confidence < 0.6) {
-            // Will be handled by runtime discovery
             return {
               ...step,
               originalSelector,
-              elementDiscovery: undefined // Will be discovered at runtime
+              elementDiscovery: undefined
             } as IRefinedStep;
           }
-
-          // Create refinement record
-          const refinement: IPlanRefinement = {
-            stepId: step.id,
-            originalSelector,
-            refinedSelector,
-            reason: `Refined selector based on DOM analysis`,
-            timestamp: Date.now(),
-            confidence
-          };
 
           // Update step with refined selector
           const refinedStep: IRefinedStep = {
@@ -221,7 +240,7 @@ export class AdaptivePlanner implements IPlanner {
                 selector: refinedSelector,
                 confidence,
                 alternatives,
-                originalSelector // Keep original for reference
+                originalSelector
               }
             },
             originalSelector,
@@ -240,9 +259,9 @@ export class AdaptivePlanner implements IPlanner {
           return refinedStep;
         });
 
-      // Collect refinements and add removal records
+      // Collect refinements
       const refinements: IPlanRefinement[] = parsed.refinements || [];
-      
+
       // Add removal records to refinement history
       removedStepsInfo.forEach(removed => {
         refinements.push({
@@ -252,23 +271,37 @@ export class AdaptivePlanner implements IPlanner {
         });
       });
 
+      // Trim refinement history to max size
+      const existingHistory = adaptivePlan.refinementHistory || [];
+      const combinedHistory = [...existingHistory, ...refinements];
+      const trimmedHistory = combinedHistory.slice(-this.maxRefinementHistory);
+
+      if (combinedHistory.length > trimmedHistory.length) {
+        this.logger.debug('PLAN REFINEMENT: Trimmed refinement history', {
+          testId,
+          planId: plan.id,
+          removedEntries: combinedHistory.length - trimmedHistory.length,
+          maxHistory: this.maxRefinementHistory
+        });
+      }
+
       const refinedPlan: IAdaptivePlan = {
         ...adaptivePlan,
         steps: refinedSteps,
         phase: 'refined',
-        refinementHistory: [...(adaptivePlan.refinementHistory || []), ...refinements],
+        refinementHistory: trimmedHistory,
         refinementTimestamp: Date.now(),
         createdAt: adaptivePlan.createdAt || Date.now()
       };
 
-      this.logger.info('PLAN REFINEMENT: Plan refinement completed successfully', {
+      this.logger.info('PLAN REFINEMENT v1.0: Completed successfully', {
         testId,
         planId: plan.id,
         originalStepsCount: adaptivePlan.steps.length,
         refinedStepsCount: refinedSteps.length,
         removedStepsCount: removedStepIds.size,
         refinementsCount: refinements.length,
-        refinedSelectorsCount: refinedSteps.filter(s => (s as IRefinedStep).elementDiscovery).length
+        historySize: trimmedHistory.length
       });
 
       return refinedPlan;
@@ -278,20 +311,20 @@ export class AdaptivePlanner implements IPlanner {
         stack: error.stack,
         name: error.name
       } : { message: String(error) };
-      
-      this.logger.error('PLAN REFINEMENT: Plan refinement failed', {
+
+      this.logger.error('PLAN REFINEMENT v1.0: Failed', {
         testId,
         planId: plan.id,
         error: errorDetails,
         willContinueWithOriginalPlan: true
       });
-      
-      // Return original plan if refinement fails
+
+      // Return original plan with error recorded in history
       return {
         ...adaptivePlan,
-        phase: 'refined', // Mark as refined even if failed (to avoid retry)
+        phase: 'refined',
         refinementHistory: [
-          ...(adaptivePlan.refinementHistory || []),
+          ...(adaptivePlan.refinementHistory || []).slice(-this.maxRefinementHistory),
           {
             stepId: 'plan-refinement',
             reason: `Refinement failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -303,229 +336,8 @@ export class AdaptivePlanner implements IPlanner {
   }
 
   /**
-   * Incrementally refine only the next step(s) after successful execution
-   * More efficient than refining the entire plan
-   */
-  async refineNextStep(
-    plan: IAdaptivePlan,
-    page: Page,
-    executedSteps: IExecutionResult[],
-    nextStepIndex: number,
-    testId?: string
-  ): Promise<{ plan: IAdaptivePlan; removedStepIds: string[] }> {
-    const planTestId = testId || plan.scenarioId;
-    
-    // Get the next step to refine
-    if (nextStepIndex >= plan.steps.length) {
-      this.logger.debug('No next step to refine', { testId: planTestId, nextStepIndex, totalSteps: plan.steps.length });
-      return { plan, removedStepIds: [] };
-    }
-
-    const nextStep = plan.steps[nextStepIndex];
-    
-    this.logger.info('INCREMENTAL REFINEMENT: Refining next step', { 
-      testId: planTestId,
-      planId: plan.id,
-      nextStepId: nextStep.id,
-      nextStepDescription: nextStep.description,
-      executedStepsCount: executedSteps.length,
-      pageUrl: page.url()
-    });
-
-    try {
-      // Extract DOM structure
-      const domStructure = await this.extractDOMStructure(page);
-      const url = page.url();
-      
-      // Prepare last executed step summary
-      const lastExecutedStep = executedSteps.length > 0 ? {
-        stepId: executedSteps[executedSteps.length - 1].stepId,
-        status: executedSteps[executedSteps.length - 1].status,
-        description: plan.steps.find(s => s.id === executedSteps[executedSteps.length - 1].stepId)?.description || 'unknown'
-      } : null;
-
-      // Use LLM to refine only the next step
-      const systemPrompt = this.promptManager.render('planner-refine-system', {});
-      const userPrompt = this.promptManager.render('planner-refine-next-step-user', {
-        originalPlan: JSON.stringify(plan, null, 2),
-        domStructure: domStructure.substring(0, 15000), // Limit size
-        url,
-        lastExecutedStep: lastExecutedStep ? JSON.stringify(lastExecutedStep, null, 2) : 'None',
-        nextStep: JSON.stringify(nextStep, null, 2)
-      });
-
-      this.logger.debug('INCREMENTAL REFINEMENT: Calling LLM for next step refinement', {
-        testId: planTestId,
-        planId: plan.id,
-        nextStepId: nextStep.id,
-        model: this.model
-      });
-
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        this.logger.error('INCREMENTAL REFINEMENT: LLM returned empty response', { testId: planTestId, nextStepId: nextStep.id });
-        return { plan, removedStepIds: [] };
-      }
-
-      const parsed = JSON.parse(content);
-      
-      if (parsed.error) {
-        this.logger.error('INCREMENTAL REFINEMENT: LLM returned error', {
-          testId: planTestId,
-          nextStepId: nextStep.id,
-          error: parsed.error
-        });
-        return { plan, removedStepIds: [] };
-      }
-
-      // Handle removed steps
-      const removedStepIds: string[] = [];
-      const removedStepsInfo: Array<{ stepId: string; reason: string }> = parsed.removedSteps || [];
-      
-      removedStepsInfo.forEach(removed => {
-        if (removed.stepId === nextStep.id) {
-          removedStepIds.push(removed.stepId);
-          this.logger.info('INCREMENTAL REFINEMENT: Next step marked for removal', {
-            testId: planTestId,
-            stepId: removed.stepId,
-            reason: removed.reason
-          });
-        }
-      });
-
-      // If step should be removed, remove it from plan
-      if (removedStepIds.includes(nextStep.id)) {
-        const updatedSteps = plan.steps.filter(s => s.id !== nextStep.id);
-        const refinement: IPlanRefinement = {
-          stepId: nextStep.id,
-          reason: removedStepsInfo.find(r => r.stepId === nextStep.id)?.reason || 'Step removed as unnecessary',
-          timestamp: Date.now()
-        };
-
-        const refinedPlan: IAdaptivePlan = {
-          ...plan,
-          steps: updatedSteps,
-          phase: 'adaptive',
-          refinementHistory: [...(plan.refinementHistory || []), refinement],
-          refinementTimestamp: Date.now()
-        };
-
-        this.logger.info('INCREMENTAL REFINEMENT: Next step removed', {
-          testId: planTestId,
-          stepId: nextStep.id,
-          reason: refinement.reason,
-          remainingSteps: updatedSteps.length
-        });
-
-        return { plan: refinedPlan, removedStepIds };
-      }
-
-      // If step should be refined, update it
-      const refinedStepData = parsed.steps && parsed.steps.length > 0 ? parsed.steps[0] : null;
-      if (refinedStepData && refinedStepData.id === nextStep.id) {
-        const interactionActions = ['click', 'type', 'hover'];
-        const isInteractionStep = interactionActions.includes(nextStep.action.name) ||
-          nextStep.action.name.startsWith('verify_element');
-
-        if (isInteractionStep) {
-          const originalSelector = nextStep.action.arguments.selector as string;
-          const refinedSelector = refinedStepData.action?.arguments?.selector as string;
-          const confidence = refinedStepData.action?.arguments?.confidence as number || 0.5;
-          const alternatives = refinedStepData.action?.arguments?.alternatives as string[] || [];
-
-          if (refinedSelector && confidence >= 0.6) {
-            const refinement: IPlanRefinement = {
-              stepId: nextStep.id,
-              originalSelector,
-              refinedSelector,
-              reason: `Incrementally refined selector based on DOM analysis`,
-              timestamp: Date.now(),
-              confidence
-            };
-
-            // Update the step in the plan
-            const updatedSteps = plan.steps.map(step => {
-              if (step.id === nextStep.id) {
-                return {
-                  ...step,
-                  action: {
-                    ...step.action,
-                    arguments: {
-                      ...step.action.arguments,
-                      selector: refinedSelector,
-                      confidence,
-                      alternatives,
-                      originalSelector
-                    }
-                  },
-                  originalSelector,
-                  elementDiscovery: {
-                    selector: refinedSelector,
-                    confidence,
-                    alternatives,
-                    elementInfo: refinedStepData.action?.arguments?.elementInfo || {
-                      tag: 'unknown',
-                      attributes: {}
-                    },
-                    strategy: 'INCREMENTAL_REFINEMENT'
-                  }
-                } as IRefinedStep;
-              }
-              return step;
-            });
-
-            const refinedPlan: IAdaptivePlan = {
-              ...plan,
-              steps: updatedSteps,
-              phase: 'adaptive',
-              refinementHistory: [...(plan.refinementHistory || []), refinement],
-              refinementTimestamp: Date.now()
-            };
-
-            this.logger.info('INCREMENTAL REFINEMENT: Next step refined', {
-              testId: planTestId,
-              stepId: nextStep.id,
-              originalSelector,
-              refinedSelector,
-              confidence
-            });
-
-            return { plan: refinedPlan, removedStepIds };
-          }
-        }
-      }
-
-      // No changes needed
-      return { plan, removedStepIds };
-    } catch (error) {
-      const errorDetails = error instanceof Error ? {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      } : { message: String(error) };
-      
-      this.logger.error('INCREMENTAL REFINEMENT: Failed', {
-        testId: planTestId,
-        nextStepId: nextStep.id,
-        error: errorDetails
-      });
-      
-      return { plan, removedStepIds: [] };
-    }
-  }
-
-  /**
    * Adapt plan during execution based on failures
+   * v1.0: Uses retry logic and circuit breaker
    */
   async adaptPlan(
     plan: IAdaptivePlan,
@@ -533,25 +345,24 @@ export class AdaptivePlanner implements IPlanner {
     failure: IExecutionResult,
     page: Page
   ): Promise<IAdaptivePlan> {
-    const testId = plan.scenarioId; // Extract testId from scenarioId
-    
-    this.logger.info('Adapting plan due to step failure', { 
+    const testId = plan.scenarioId;
+
+    this.logger.info('PLAN ADAPTATION v1.0: Adapting due to failure', {
       testId,
-      planId: plan.id, 
+      planId: plan.id,
       stepId: failedStep.id,
-      error: failure.error 
+      error: failure.error
     });
 
     const interactionActions = ['click', 'type', 'hover'];
     const isInteractionStep = interactionActions.includes(failedStep.action.name);
 
     if (!isInteractionStep) {
-      // Can't adapt non-interaction steps
       return plan;
     }
 
-    const description = (failedStep.action.arguments.description as string) || 
-                       (failedStep.action.arguments.selector as string) || 
+    const description = (failedStep.action.arguments.description as string) ||
+                       (failedStep.action.arguments.selector as string) ||
                        failedStep.description;
 
     if (!description) {
@@ -560,17 +371,31 @@ export class AdaptivePlanner implements IPlanner {
     }
 
     try {
-      // Use element discovery to find the element
-      const discovery = await this.elementDiscovery.discoverElement(
-        page,
-        description,
-        failedStep.action.name as 'click' | 'type' | 'hover',
+      // Use element discovery with retry
+      const discovery = await this.retryStrategy.execute(
+        () => this.elementDiscovery.discoverElement(
+          page,
+          description,
+          failedStep.action.name as 'click' | 'type' | 'hover',
+          {
+            url: page.url(),
+            html: failure.snapshot.metadata.html_length as number > 0
+              ? 'available'
+              : undefined,
+            testId
+          }
+        ),
         {
-          url: page.url(),
-          html: failure.snapshot.metadata.html_length as number > 0 
-            ? 'available' 
-            : undefined,
-          testId
+          maxRetries: 2,
+          backoff: 'exponential',
+          initialDelay: 1000,
+          onRetry: (error, attempt) => {
+            this.logger.warn(`Element discovery retry ${attempt}`, {
+              testId,
+              stepId: failedStep.id,
+              error: error.message
+            });
+          }
         }
       );
 
@@ -609,112 +434,160 @@ export class AdaptivePlanner implements IPlanner {
         confidence: discovery.confidence
       };
 
+      // Trim history
+      const combinedHistory = [...(plan.refinementHistory || []), refinement];
+      const trimmedHistory = combinedHistory.slice(-this.maxRefinementHistory);
+
       return {
         ...plan,
         steps: adaptedSteps,
         phase: 'adaptive',
-        refinementHistory: [...(plan.refinementHistory || []), refinement]
+        refinementHistory: trimmedHistory
       };
     } catch (error) {
-      this.logger.error('Plan adaptation failed', {
+      this.logger.error('PLAN ADAPTATION v1.0: Failed', {
         testId,
+        stepId: failedStep.id,
         error: error instanceof Error ? error.message : String(error)
       });
-      return plan; // Return original plan if adaptation fails
+      return plan;
     }
   }
 
   /**
+   * Call LLM with retry strategy and circuit breaker protection
+   */
+  private async callLLMWithProtection<T>(
+    operationKey: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.circuitBreaker.execute(
+      operationKey,
+      () => this.retryStrategy.execute(
+        operation,
+        {
+          maxRetries: 3,
+          backoff: 'exponential',
+          initialDelay: 1000,
+          maxDelay: 10000,
+          onRetry: (error, attempt) => {
+            this.logger.warn(`LLM call retry ${attempt}/${3}`, {
+              operation: operationKey,
+              error: error.message
+            });
+          }
+        }
+      )
+    );
+  }
+
+  /**
    * Extract simplified DOM structure
-   * Uses function declaration instead of arrow function to avoid __name transpilation issues
+   * v1.0: Improved error handling
    */
   private async extractDOMStructure(page: Page): Promise<string> {
-    return await page.evaluate(function() {
-      function extractElementInfo(el: Element): any {
-        const info: any = {
-          tag: el.tagName.toLowerCase(),
-          attributes: {}
-        };
+    try {
+      return await page.evaluate(function() {
+        function extractElementInfo(el: Element): any {
+          const info: any = {
+            tag: el.tagName.toLowerCase(),
+            attributes: {}
+          };
 
-        if (el.id) {
-          info.id = el.id;
-        }
-        if (el.className && typeof el.className === 'string') {
-          const classList = el.className.split(/\s+/);
-          info.classes = [];
-          for (let i = 0; i < classList.length; i++) {
-            const c = classList[i];
-            if (c.length > 0) {
-              info.classes.push(c);
+          if (el.id) {
+            info.id = el.id;
+          }
+          if (el.className && typeof el.className === 'string') {
+            const classList = el.className.split(/\s+/);
+            info.classes = [];
+            for (let i = 0; i < classList.length; i++) {
+              const c = classList[i];
+              if (c.length > 0) {
+                info.classes.push(c);
+              }
             }
           }
+
+          const importantAttrs = ['role', 'type', 'name', 'data-testid', 'aria-label', 'placeholder', 'value'];
+          for (let i = 0; i < importantAttrs.length; i++) {
+            const attr = importantAttrs[i];
+            const value = el.getAttribute(attr);
+            if (value) {
+              info.attributes[attr] = value;
+              if (attr === 'role') info.role = value;
+              if (attr === 'type') info.type = value;
+              if (attr === 'name') info.name = value;
+              if (attr === 'data-testid') info['data-testid'] = value;
+              if (attr === 'aria-label') info['aria-label'] = value;
+            }
+          }
+
+          const textContent = el.textContent;
+          if (textContent) {
+            const trimmed = textContent.trim();
+            if (trimmed.length > 0 && trimmed.length < 100) {
+              info.text = trimmed;
+            }
+          }
+
+          return info;
         }
 
-        const importantAttrs = ['role', 'type', 'name', 'data-testid', 'aria-label', 'placeholder', 'value'];
-        for (let i = 0; i < importantAttrs.length; i++) {
-          const attr = importantAttrs[i];
-          const value = el.getAttribute(attr);
-          if (value) {
-            info.attributes[attr] = value;
-            if (attr === 'role') info.role = value;
-            if (attr === 'type') info.type = value;
-            if (attr === 'name') info.name = value;
-            if (attr === 'data-testid') info['data-testid'] = value;
-            if (attr === 'aria-label') info['aria-label'] = value;
+        const selectors = [
+          'button',
+          'a',
+          'input',
+          'select',
+          'textarea',
+          '[role="button"]',
+          '[role="link"]',
+          '[data-testid]',
+          '[id]',
+          'h1, h2, h3, h4, h5, h6'
+        ];
+
+        const elements: any[] = [];
+        for (let i = 0; i < selectors.length; i++) {
+          const selector = selectors[i];
+          try {
+            const nodeList = document.querySelectorAll(selector);
+            for (let j = 0; j < nodeList.length; j++) {
+              const el = nodeList[j];
+              elements.push(extractElementInfo(el));
+            }
+          } catch (e) {
+            // Ignore invalid selectors
           }
         }
 
-        const textContent = el.textContent;
-        if (textContent) {
-          const trimmed = textContent.trim();
-          if (trimmed.length > 0 && trimmed.length < 100) {
-            info.text = trimmed;
+        const seen = new Set();
+        const uniqueElements: any[] = [];
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i];
+          const key = el.tag + '-' + (el.id || '') + '-' + (el.classes ? el.classes.join(',') : '');
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueElements.push(el);
           }
         }
 
-        return info;
-      }
+        return JSON.stringify(uniqueElements.slice(0, 200), null, 2);
+      });
+    } catch (error) {
+      this.logger.error('Failed to extract DOM structure', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      // Return empty structure on error
+      return JSON.stringify([], null, 2);
+    }
+  }
 
-      const selectors = [
-        'button',
-        'a',
-        'input',
-        'select',
-        'textarea',
-        '[role="button"]',
-        '[role="link"]',
-        '[data-testid]',
-        '[id]',
-        'h1, h2, h3, h4, h5, h6'
-      ];
-
-      const elements: any[] = [];
-      for (let i = 0; i < selectors.length; i++) {
-        const selector = selectors[i];
-        try {
-          const nodeList = document.querySelectorAll(selector);
-          for (let j = 0; j < nodeList.length; j++) {
-            const el = nodeList[j];
-            elements.push(extractElementInfo(el));
-          }
-        } catch (e) {
-          // Ignore invalid selectors
-        }
-      }
-
-      const seen = new Set();
-      const uniqueElements: any[] = [];
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const key = el.tag + '-' + (el.id || '') + '-' + (el.classes ? el.classes.join(',') : '');
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueElements.push(el);
-        }
-      }
-
-      return JSON.stringify(uniqueElements.slice(0, 200), null, 2);
-    });
+  /**
+   * Cleanup resources
+   */
+  cleanup(): void {
+    this.logger.info('AdaptivePlanner v1.0: Cleaning up resources');
+    this.domCache.clear();
+    this.circuitBreaker.resetAll();
   }
 }
-
