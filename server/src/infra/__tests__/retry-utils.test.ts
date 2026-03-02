@@ -98,6 +98,9 @@ describe('RetryStrategy', () => {
         initialDelay: 100
       });
 
+      // Catch the promise rejection to prevent unhandled rejection
+      promise.catch(() => {});
+
       await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toThrow('always fails');
