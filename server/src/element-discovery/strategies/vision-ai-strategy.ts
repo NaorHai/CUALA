@@ -5,12 +5,16 @@ import { IElementDiscoveryResult } from '../../types/index.js';
 import { ILogger } from '../../infra/logger.js';
 import { IConfig } from '../../infra/config.js';
 import { PromptManager } from '../../infra/prompt-manager.js';
+import { RetryStrategy, CircuitBreaker, createDefaultRetryStrategy, createDefaultCircuitBreaker } from '../../infra/retry-utils.js';
+import { DOMCache, createDefaultDOMCache } from '../../infra/dom-cache.js';
+import { DOMExtractor } from '../dom-extractor.js';
 
 /**
- * Vision AI-based element discovery strategy (Hybrid DOM + Screenshot)
+ * Vision AI-based element discovery strategy v1.0 (Hybrid DOM + Screenshot)
  * For semantic concepts: Uses screenshot + Vision AI for visual understanding, then DOM for selector extraction
  * For specific elements: Uses DOM analysis only
  * Always returns CSS selectors (never pixel coordinates) for DOM-based execution
+ * v1.0: Added retry logic, DOM caching, and better validation
  */
 export class VisionAIStrategy implements IElementDiscoveryStrategy {
   public readonly name = 'VISION_AI';
@@ -18,6 +22,10 @@ export class VisionAIStrategy implements IElementDiscoveryStrategy {
   private textModel: string;
   private visionModel: string;
   private promptManager: PromptManager;
+  private retryStrategy: RetryStrategy;
+  private circuitBreaker: CircuitBreaker;
+  private domCache: DOMCache;
+  private domExtractor: DOMExtractor;
 
   // Semantic concepts that are better identified visually
   private readonly semanticConcepts = [
@@ -61,6 +69,17 @@ export class VisionAIStrategy implements IElementDiscoveryStrategy {
     // Use text model for DOM-only analysis of specific elements
     this.textModel = config.get('OPENAI_MODEL') || 'gpt-4-turbo-preview';
     this.promptManager = PromptManager.getInstance();
+
+    // Initialize resilience utilities (v1.0)
+    this.retryStrategy = createDefaultRetryStrategy(logger);
+    this.circuitBreaker = createDefaultCircuitBreaker(logger);
+    this.domCache = createDefaultDOMCache(logger);
+    this.domExtractor = new DOMExtractor(logger);
+
+    logger.info('VisionAIStrategy v1.0 initialized', {
+      visionModel: this.visionModel,
+      textModel: this.textModel
+    });
   }
 
   async discover(
@@ -118,9 +137,21 @@ export class VisionAIStrategy implements IElementDiscoveryStrategy {
     const screenshot = await page.screenshot({ type: 'jpeg', quality: 80 });
     const base64Screenshot = screenshot.toString('base64');
 
-    // Extract DOM structure for selector extraction
-    const domStructure = await this.extractDOMStructure(page);
+    // Extract or get cached DOM structure (v1.0 optimization)
     const url = context?.url || page.url();
+    let domStructure = this.domCache.get(url);
+
+    if (!domStructure) {
+      this.logger.debug('Vision AI: DOM cache miss, extracting', { testId: context?.testId, url });
+      domStructure = await this.domExtractor.extract(page, {
+        maxElements: 300,
+        includePosition: true, // Include position for vision AI
+        includeContainers: true
+      });
+      this.domCache.set(url, domStructure);
+    } else {
+      this.logger.debug('Vision AI: DOM cache hit', { testId: context?.testId, url });
+    }
 
     // Use Vision AI with screenshot + DOM for hybrid analysis
     const visionResult = await this.getElementFromHybridAnalysis(
@@ -186,9 +217,21 @@ export class VisionAIStrategy implements IElementDiscoveryStrategy {
       approach: 'DOM analysis only'
     });
 
-    // Extract DOM structure
-    const domStructure = await this.extractDOMStructure(page);
+    // Extract or get cached DOM structure (v1.0 optimization)
     const url = context?.url || page.url();
+    let domStructure = this.domCache.get(url);
+
+    if (!domStructure) {
+      this.logger.debug('Vision AI: DOM cache miss for specific element', { testId: context?.testId, url });
+      domStructure = await this.domExtractor.extract(page, {
+        maxElements: 300,
+        includePosition: true,
+        includeContainers: true
+      });
+      this.domCache.set(url, domStructure);
+    } else {
+      this.logger.debug('Vision AI: DOM cache hit for specific element', { testId: context?.testId, url });
+    }
 
     // Build intent prompt
     const intent = this.buildIntentPrompt(description, actionType, url);

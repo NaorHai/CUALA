@@ -66,6 +66,12 @@ export interface ILLMProvider {
   getAvailableModels(): string[];
 
   /**
+   * Get the default model for this provider
+   * Used when no model is explicitly specified
+   */
+  getDefaultModel(): string;
+
+  /**
    * Validate API key and connection
    */
   validateConnection(): Promise<boolean>;

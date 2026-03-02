@@ -244,8 +244,8 @@ export class SmartElementLocator {
       this.logger.debug(`INTELLIGENT DOM SEARCH: Searching for "${description}"`, { testId, actionType });
       
       // Extract all candidate elements and score them
-      // Use function declaration instead of arrow function to avoid __name transpilation issues
-      const candidates = await page.evaluate(function(args: any) {
+      // Use arrow function without TypeScript annotations to avoid __name transpilation issues
+      const candidates = await page.evaluate((args) => {
         const desc = args.desc;
         const actType = args.actType;
         
@@ -604,7 +604,7 @@ export class SmartElementLocator {
             const keyText = extractKeyText(description);
             
             // Try to create a more specific selector by combining with text content or href
-            const moreSpecificSelector = await page.evaluate(function(args: any) {
+            const moreSpecificSelector = await page.evaluate((args) => {
               const baseSelector = args.selector;
               const targetText = args.text;
               const targetHref = args.href;
@@ -1119,7 +1119,7 @@ export class SmartElementLocator {
     selector: string
   ): Promise<{ tag: string; type?: string; attributes: Record<string, string> } | null> {
     try {
-      const elementInfo = await page.evaluate(function(sel: string) {
+      const elementInfo = await page.evaluate((sel) => {
         const element = document.querySelector(sel);
         if (!element) return null;
         
@@ -1178,7 +1178,7 @@ export class SmartElementLocator {
       }
 
       // Try to find input fields near the discovered element
-      const nearbyInputs = await page.evaluate(function(sel: string) {
+      const nearbyInputs = await page.evaluate((sel) => {
         const element = document.querySelector(sel);
         if (!element) return [];
         
@@ -1258,7 +1258,7 @@ export class SmartElementLocator {
   ): Promise<string | null> {
     try {
       // Get element at coordinates and extract selector in one call
-      const selector = await page.evaluate(function(coords: any): string | null {
+      const selector = await page.evaluate((coords) => {
         const element = document.elementFromPoint(coords.x, coords.y);
         if (!element) return null;
         

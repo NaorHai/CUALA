@@ -7,3 +7,8 @@ screenshots/
 test-results/
 playwright-report/
 .DS_Store
+
+# Sanity tests with PII (DO NOT COMMIT)
+**/sanity/**
+**/*sanity*.ts
+**/*sanity*.js

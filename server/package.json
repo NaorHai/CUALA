@@ -1,11 +1,13 @@
 {
   "name": "cuala",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Deterministic natural-language browser automation with vision fallback",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "test": "vitest",
+    "test:sanity": "tsx src/sanity/sanity-test-template.ts",
+    "test:sanity:sf": "tsx src/sanity/salesforce-data-cloud-sanity.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "run-example": "tsx src/run-example.ts",
