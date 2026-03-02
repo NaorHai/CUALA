@@ -1,32 +1,60 @@
+/**
+ * LLM-based DOM Analysis Strategy v1.0
+ * Refactored with retry logic, DOM caching, and better validation
+ */
+
 import { Page } from 'playwright';
-import OpenAI from 'openai';
 import { IElementDiscoveryStrategy } from '../index.js';
 import { IElementDiscoveryResult } from '../../types/index.js';
 import { ILogger } from '../../infra/logger.js';
 import { IConfig } from '../../infra/config.js';
 import { PromptManager } from '../../infra/prompt-manager.js';
+import { RetryStrategy, CircuitBreaker, RetryableError, createDefaultRetryStrategy, createDefaultCircuitBreaker } from '../../infra/retry-utils.js';
+import { DOMCache, createDefaultDOMCache } from '../../infra/dom-cache.js';
+import { DOMExtractor } from '../dom-extractor.js';
+import { LLMProviderFactory, ILLMProvider } from '../../providers/index.js';
 
 /**
- * LLM-based DOM analysis strategy
- * Uses OpenAI to analyze DOM structure and find matching elements
+ * LLM-based DOM analysis strategy with production-grade reliability
  */
 export class LLMDOMStrategy implements IElementDiscoveryStrategy {
   public readonly name = 'LLM_DOM_ANALYSIS';
-  private client: OpenAI;
+  private provider: ILLMProvider;
   private model: string;
   private promptManager: PromptManager;
+  private retryStrategy: RetryStrategy;
+  private circuitBreaker: CircuitBreaker;
+  private domCache: DOMCache;
+  private domExtractor: DOMExtractor;
 
   constructor(
     private config: IConfig,
     private logger: ILogger
   ) {
-    const apiKey = config.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is not defined for LLMDOMStrategy');
+    // Use provider abstraction instead of direct OpenAI client
+    this.provider = LLMProviderFactory.createFromConfig(config, logger);
+
+    // Get model from provider
+    if (this.provider.name === 'openai') {
+      this.model = (this.provider as any).getDefaultModel?.() || config.get('OPENAI_MODEL') || 'gpt-4-turbo-preview';
+    } else if (this.provider.name === 'anthropic') {
+      this.model = (this.provider as any).getDefaultModel?.() || config.get('ANTHROPIC_MODEL') || 'claude-3-5-haiku-20241022';
+    } else {
+      this.model = 'default';
     }
-    this.client = new OpenAI({ apiKey });
-    this.model = config.get('OPENAI_MODEL') || 'gpt-4-turbo-preview';
+
     this.promptManager = PromptManager.getInstance();
+
+    // Initialize resilience utilities
+    this.retryStrategy = createDefaultRetryStrategy(logger);
+    this.circuitBreaker = createDefaultCircuitBreaker(logger);
+    this.domCache = createDefaultDOMCache(logger);
+    this.domExtractor = new DOMExtractor(logger);
+
+    logger.info('LLMDOMStrategy v1.0 initialized', {
+      provider: this.provider.name,
+      model: this.model
+    });
   }
 
   async discover(
@@ -39,68 +67,142 @@ export class LLMDOMStrategy implements IElementDiscoveryStrategy {
       testId?: string;
     }
   ): Promise<IElementDiscoveryResult | null> {
+    const url = context?.url || page.url();
+    const testId = context?.testId;
+
+    this.logger.debug('LLM DOM Strategy v1.0: Starting discovery', {
+      testId,
+      description,
+      actionType,
+      url
+    });
+
     try {
-      // Extract simplified DOM structure
-      const domStructure = await this.extractDOMStructure(page);
-      
-      if (!domStructure || domStructure.length === 0) {
-        this.logger.warn('Empty DOM structure extracted');
+      // Try to get cached DOM structure
+      let domStructure = this.domCache.get(url);
+
+      if (!domStructure) {
+        this.logger.debug('LLM DOM Strategy: Cache miss, extracting DOM', { testId, url });
+
+        // Extract DOM using centralized extractor
+        domStructure = await this.domExtractor.extract(page, {
+          maxElements: 200,
+          includePosition: false,
+          includeContainers: actionType === 'verify' // Include containers for verify actions
+        });
+
+        // Cache the result
+        this.domCache.set(url, domStructure);
+      } else {
+        this.logger.debug('LLM DOM Strategy: Cache hit', { testId, url });
+      }
+
+      if (!domStructure || domStructure === '[]') {
+        this.logger.warn('Empty DOM structure extracted', { testId });
         return null;
       }
 
-      // Use LLM to analyze DOM and find matching element
+      // Use LLM to analyze DOM with retry and circuit breaker
       const systemPrompt = this.promptManager.render('element-discovery-system', {});
       const userPrompt = this.promptManager.render('element-discovery-user', {
         description,
         actionType,
         domStructure: domStructure.substring(0, 15000), // Limit size
-        url: context?.url || page.url()
+        url
       });
 
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1, // Low temperature for consistency
+      this.logger.debug('LLM DOM Strategy: Calling LLM with retry protection', {
+        testId,
+        provider: this.provider.name,
+        model: this.model
       });
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        this.logger.warn('LLM returned empty response for element discovery');
-        return null;
-      }
+      // Call LLM with retry and circuit breaker
+      const content = await this.callLLMWithProtection(async () => {
+        const response = await this.provider.createChatCompletion({
+          model: this.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+        });
+
+        if (!response.content) {
+          throw new RetryableError('LLM returned empty response for element discovery');
+        }
+
+        return response.content;
+      });
 
       const parsed = JSON.parse(content);
-      
+
       if (parsed.error || !parsed.selector) {
-        this.logger.warn('LLM element discovery failed', { error: parsed.error });
+        this.logger.warn('LLM element discovery failed', {
+          testId,
+          error: parsed.error
+        });
         return null;
       }
 
-      // Validate selector exists on page
-      const selectorExists = await this.validateSelector(page, parsed.selector);
-      if (!selectorExists) {
-        this.logger.warn(`LLM suggested selector does not exist: ${parsed.selector}`);
+      // Validate selector with enhanced validation
+      const primaryValidation = await this.domExtractor.validateSelector(page, parsed.selector);
+
+      if (!primaryValidation.exists || !primaryValidation.isVisible) {
+        this.logger.warn('Primary selector invalid', {
+          testId,
+          selector: parsed.selector,
+          validation: primaryValidation
+        });
+
         // Try alternatives if provided
         if (parsed.alternatives && parsed.alternatives.length > 0) {
-          for (const alt of parsed.alternatives) {
-            if (await this.validateSelector(page, alt)) {
-              parsed.selector = alt;
-              parsed.confidence = Math.max(0.5, parsed.confidence - 0.2); // Reduce confidence for alternative
-              break;
-            }
+          const bestResult = await this.domExtractor.getBestSelector(
+            page,
+            parsed.alternatives
+          );
+
+          if (bestResult.selector) {
+            this.logger.info('Using alternative selector', {
+              testId,
+              originalSelector: parsed.selector,
+              alternativeSelector: bestResult.selector,
+              confidence: bestResult.confidence
+            });
+
+            return {
+              selector: bestResult.selector,
+              confidence: bestResult.confidence,
+              alternatives: parsed.alternatives.filter((s: string) => s !== bestResult.selector),
+              elementInfo: parsed.elementInfo || {
+                tag: 'unknown',
+                attributes: {}
+              },
+              strategy: this.name
+            };
           }
-        } else {
-          return null;
         }
+
+        return null;
       }
+
+      // Calculate confidence based on validation
+      let confidence = parsed.confidence || 0.7;
+      if (primaryValidation.isUnique) confidence += 0.1;
+      if (primaryValidation.isVisible) confidence += 0.1;
+      confidence = Math.min(1, Math.max(0, confidence));
+
+      this.logger.info('LLM DOM Strategy v1.0: Element discovered', {
+        testId,
+        selector: parsed.selector,
+        confidence,
+        validation: primaryValidation
+      });
 
       return {
         selector: parsed.selector,
-        confidence: Math.min(1, Math.max(0, parsed.confidence || 0.7)),
+        confidence,
         alternatives: parsed.alternatives || [],
         elementInfo: parsed.elementInfo || {
           tag: 'unknown',
@@ -109,114 +211,47 @@ export class LLMDOMStrategy implements IElementDiscoveryStrategy {
         strategy: this.name
       };
     } catch (error) {
-      this.logger.error('LLM DOM strategy failed', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error('LLM DOM Strategy v1.0 failed', {
+        testId,
+        error: errorMsg,
+        description
+      });
       return null;
     }
   }
 
   /**
-   * Extract simplified, semantic DOM structure
-   * Focuses on interactive elements, IDs, classes, text content
+   * Call LLM with retry and circuit breaker protection
    */
-  private async extractDOMStructure(page: Page): Promise<string> {
-    return await page.evaluate(function() {
-      // Self-contained function - no external dependencies
-      function extractElementInfo(el: Element): any {
-        const info: any = {
-          tag: el.tagName.toLowerCase(),
-          attributes: {}
-        };
-
-        // Extract important attributes
-        if (el.id) {
-          info.id = el.id;
-        }
-        if (el.className && typeof el.className === 'string') {
-          const classList = el.className.split(/\s+/);
-          info.classes = classList.filter(function(c) { return c.length > 0; });
-        }
-
-        // Extract semantic attributes
-        const importantAttrs = ['role', 'type', 'name', 'data-testid', 'aria-label', 'placeholder', 'value'];
-        for (let i = 0; i < importantAttrs.length; i++) {
-          const attr = importantAttrs[i];
-          const value = el.getAttribute(attr);
-          if (value) {
-            info.attributes[attr] = value;
-            if (attr === 'role') info.role = value;
-            if (attr === 'type') info.type = value;
-            if (attr === 'name') info.name = value;
-            if (attr === 'data-testid') info['data-testid'] = value;
-            if (attr === 'aria-label') info['aria-label'] = value;
+  private async callLLMWithProtection<T>(
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.circuitBreaker.execute(
+      'llm-dom-discovery',
+      () => this.retryStrategy.execute(
+        operation,
+        {
+          maxRetries: 3,
+          backoff: 'exponential',
+          initialDelay: 1000,
+          maxDelay: 10000,
+          onRetry: (error, attempt) => {
+            this.logger.warn(`LLM DOM discovery retry ${attempt}/3`, {
+              error: error.message
+            });
           }
         }
-
-        // Extract text content (limited length)
-        const textContent = el.textContent;
-        if (textContent) {
-          const trimmed = textContent.trim();
-          if (trimmed.length > 0 && trimmed.length < 100) {
-            info.text = trimmed;
-          }
-        }
-
-        return info;
-      }
-
-      // Focus on interactive and important elements
-      const selectors = [
-        'button',
-        'a',
-        'input',
-        'select',
-        'textarea',
-        '[role="button"]',
-        '[role="link"]',
-        '[data-testid]',
-        '[id]',
-        'h1, h2, h3, h4, h5, h6'
-      ];
-
-      const elements: any[] = [];
-      for (let i = 0; i < selectors.length; i++) {
-        const selector = selectors[i];
-        try {
-          const nodeList = document.querySelectorAll(selector);
-          for (let j = 0; j < nodeList.length; j++) {
-            const el = nodeList[j];
-            elements.push(extractElementInfo(el));
-          }
-        } catch (e) {
-          // Ignore invalid selectors
-        }
-      }
-
-      // Remove duplicates (same element matched by multiple selectors)
-      const seen = new Set();
-      const uniqueElements: any[] = [];
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const key = el.tag + '-' + (el.id || '') + '-' + (el.classes ? el.classes.join(',') : '');
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueElements.push(el);
-        }
-      }
-
-      return JSON.stringify(uniqueElements.slice(0, 200), null, 2); // Limit to 200 elements
-    });
+      )
+    );
   }
 
   /**
-   * Validate that selector exists and is visible/interactable
+   * Cleanup resources
    */
-  private async validateSelector(page: Page, selector: string): Promise<boolean> {
-    try {
-      const count = await page.locator(selector).count();
-      return count > 0;
-    } catch (error) {
-      return false;
-    }
+  cleanup(): void {
+    this.logger.debug('LLMDOMStrategy v1.0: Cleaning up');
+    this.domCache.clear();
+    this.circuitBreaker.reset('llm-dom-discovery');
   }
 }
-
